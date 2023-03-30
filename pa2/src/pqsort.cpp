@@ -2,32 +2,116 @@
 #include <fstream>
 #include <mpi.h>
 
+#define ROOT 0
+
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
 
+/**
+ * Block-distribute an array on rank 0 to all processes in communicator.
+ * Each process gets either ceil(n/p) or floor(n/p) values.
+ * 
+ * @return local_inp (in-place)
+ * @return length of local_inp
+ */
+int distribute_array(int *inp, int len, int *local_inp, MPI_Comm comm)
+{
+    int p, rank;
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &rank);
+
+    // Decide split counts
+    int counts[p], displs[p];
+    displs[0] = 0;
+    if (rank == 0)
+    {
+        for (int i = 0; i < p; i++)
+        {
+            counts[i] = (len / p) + (i < (len % p));
+            displs[i+1] = displs[i] + counts[i];
+        }
+    }
+
+    // Communicate length and create buffers
+    int local_len;
+    MPI_Scatter(
+        (int *) counts, 1, MPI_INT, 
+        &local_len, 1, MPI_INT, 
+        ROOT, comm
+    );
+    local_inp = (int *) malloc(local_len * sizeof(int));
+
+    //std::cout << "Rank " << rank << ": " << local_len << std::endl;
+
+    // Copy data
+    MPI_Scatterv(
+        (void *) inp, (int *) counts, (int *) displs, MPI_INT,
+        (void *) local_inp, local_len, MPI_INT,
+        ROOT, comm
+    );
+
+#ifdef DEBUG
+    for (int i = 0; i < p; i++)
+    {
+        if (i == rank)
+        {
+            std::cout << "Rank " << i << ": ";
+            for (int j = 0; j < local_len; j++)
+                std::cout << local_inp[j] << " ";
+            std::cout << std::endl;
+        }
+
+        MPI_Barrier(comm);
+    }
+#endif
+    
+    return local_len;
+}
+
 int main(int argc, char *argv[])
 {
-    char *inp_fname = argv[1];
-    char *out_fname = argv[2];
-
     int p, rank;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Rank 0 reads input file and block distributes
+    int len, *inp;
+    if (rank == 0)
+    {
+        // Load input file into array
+        std::ifstream file(argv[1]);
+
+        file >> len;
+        inp = (int *) malloc(len * sizeof(int));
+        for (int i = 0; i < len; i++)
+            file >> inp[i];
+
+#ifdef DEBUG
+        std::cout << len << std::endl;
+        for (int i = 0; i < len; i++)
+            std::cout << inp[i] << " ";
+        std::cout << std::endl;
+#endif
+    }
+
     int local_len, *local_inp;
+    local_len = distribute_array(inp, len, local_inp, MPI_COMM_WORLD);
+    free(inp);
 
     // Timing start
     double starttime = MPI_Wtime();
 
-    parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
+    //parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
 
     // Timing end
     double runtime = MPI_Wtime() - starttime;
 
     // Print to output file
-    // TODO
+    if (rank == 0)
+    {
+        char *out_fname = argv[2];
+    }
 
     MPI_Finalize();
     return 0;
@@ -92,16 +176,15 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     // Create new communicators
     // TODO
     int p_low, p_high;
-    MPI_Comm comm_low, comm_high;
+    MPI_Comm comm_low, comm_high, my_comm;
 
     // Compute communication indices + All-to-all
     // TODO
-    int new_low_len, new_high_len;
-    int *new_low, *new_high;
+    int *new_arr, new_len;
 
     // Compute new seeds
     int seed_low, seed_high;
 
-    parallel_qsort(new_low, new_low_len, seed_low, comm_low);
-    parallel_qsort(new_high, new_high_len, seed_high, comm_high);
+    if (new_len > 0)
+        parallel_qsort(new_arr, new_len, seed, my_comm);
 }
