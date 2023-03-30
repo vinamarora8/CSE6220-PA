@@ -2,12 +2,12 @@
 #include <fstream>
 #include <mpi.h>
 
+
 #define ROOT 0
 
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
 int distribute_input(const char *fname, int *local_inp, MPI_Comm comm);
-
 
 int main(int argc, char *argv[])
 {
@@ -68,7 +68,7 @@ void serial_sort(int *arr, int low, int high) {
     }
 }
 
-void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
+void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
 {
 
     int p, rank;
@@ -81,17 +81,42 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     }
 
     // Choose pivot (random, with same seed) and broadcast
-    // TODO
-    int pivot;
+    // TODO 
+    int pivot_index = -1;
+    int pivot = -1;
+
+    std::srand(seed);
+    pivot_index = std::rand() % global_len;
+
+    // find which processor has the pivot
+    int pivot_rank = -1;
+    if ( (pivot_index >= rank * global_len / p ) && (pivot_index < (rank + 1) * global_len / p) ) {
+        pivot = inp[pivot_index];
+    }
+    MPI_Bcast(&pivot, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
 
     // Local partition, and count sizes
     // TODO
-    int *local_low, *local_high;
-    int local_low_len, local_high_len;
+    int local_low_len = 0, local_high_len = 0;
+
+    int i = - 1;
+    for (int j = 0; j <= len-1; j++) { 
+        if (inp[j] <= pivot) {
+            i++;
+            local_low_len++;
+            std::swap(inp[i], inp[j]);
+        }
+        else{
+            local_high_len++;
+        }
+    }
 
     // All-gather on lengths
     // TODO
     int low_len[p], high_len[p];
+    MPI_Allgather(&local_low_len, 1, MPI_INT, &low_len[rank], 1, MPI_INT, MPI_COMM_WORLD);
+    MPI_Allgather(&local_high_len, 1, MPI_INT, &high_len[rank], 1, MPI_INT, MPI_COMM_WORLD);
 
     // Compute low/high partitions and how many procs to assign for each
     // Create new communicators
