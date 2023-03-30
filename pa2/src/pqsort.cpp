@@ -3,7 +3,7 @@
 #include <mpi.h>
 
 int serial_sort(int *inp, int len);
-int parallel_qsort(int *inp, int len, MPI_Comm comm);
+int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
@@ -50,21 +50,14 @@ int partition(int *arr, int low, int high) {
     return (i + 1);
 }
 
-// The main Quick Sort function
-void quick_sort(int *arr, int low, int high) {
+// The serial sort function (Quick sort implemented)
+void serial_sort(int *arr, int low, int high) {
     if (low < high) {
         int pi = partition(arr, low, high);
-        quick_sort(arr, low, pi - 1);
-        quick_sort(arr, pi + 1, high);
+        serial_sort(arr, low, pi - 1);
+        serial_sort(arr, pi + 1, high);
     }
 }
-
-// Serial sort
-int serial_sort(int *inp, int len)
-{
-    quick_sort(inp, 0, len - 1);
-}
-
 
 int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 {
@@ -75,7 +68,7 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 
     if (p == 1)
     {
-        serial_sort(inp, len);
+        serial_sort(inp, 0, len - 1);
     }
 
     // Choose pivot (random, with same seed) and broadcast
