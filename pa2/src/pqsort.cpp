@@ -2,8 +2,8 @@
 #include <fstream>
 #include <mpi.h>
 
-int serial_sort(int *inp, int len);
-int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
+void serial_sort(int *inp, int low, int high);
+void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
@@ -11,6 +11,7 @@ int main(int argc, char *argv[])
     char *out_fname = argv[2];
 
     int p, rank;
+    MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -27,6 +28,9 @@ int main(int argc, char *argv[])
 
     // Print to output file
     // TODO
+
+    MPI_Finalize();
+    return 0;
 }
 
 // A helper function to swap two elements
@@ -59,7 +63,7 @@ void serial_sort(int *arr, int low, int high) {
     }
 }
 
-int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
+void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 {
 
     int p, rank;
