@@ -70,7 +70,7 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     // Compute communication indices + All-to-all
     // TODO
     int new_low_len, new_high_len;
-    int *new_lowx, *new_high;
+    int *new_low, *new_high;
 
     // Compute new seeds
     int seed_low, seed_high;
