@@ -6,67 +6,8 @@
 
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
+int distribute_input(const char *fname, int *local_inp, MPI_Comm comm);
 
-/**
- * Block-distribute an array on rank 0 to all processes in communicator.
- * Each process gets either ceil(n/p) or floor(n/p) values.
- * 
- * @return local_inp (in-place)
- * @return length of local_inp
- */
-int distribute_array(int *inp, int len, int *local_inp, MPI_Comm comm)
-{
-    int p, rank;
-    MPI_Comm_size(comm, &p);
-    MPI_Comm_rank(comm, &rank);
-
-    // Decide split counts
-    int counts[p], displs[p];
-    displs[0] = 0;
-    if (rank == 0)
-    {
-        for (int i = 0; i < p; i++)
-        {
-            counts[i] = (len / p) + (i < (len % p));
-            displs[i+1] = displs[i] + counts[i];
-        }
-    }
-
-    // Communicate length and create buffers
-    int local_len;
-    MPI_Scatter(
-        (int *) counts, 1, MPI_INT, 
-        &local_len, 1, MPI_INT, 
-        ROOT, comm
-    );
-    local_inp = (int *) malloc(local_len * sizeof(int));
-
-    //std::cout << "Rank " << rank << ": " << local_len << std::endl;
-
-    // Copy data
-    MPI_Scatterv(
-        (void *) inp, (int *) counts, (int *) displs, MPI_INT,
-        (void *) local_inp, local_len, MPI_INT,
-        ROOT, comm
-    );
-
-#ifdef DEBUG
-    for (int i = 0; i < p; i++)
-    {
-        if (i == rank)
-        {
-            std::cout << "Rank " << i << ": ";
-            for (int j = 0; j < local_len; j++)
-                std::cout << local_inp[j] << " ";
-            std::cout << std::endl;
-        }
-
-        MPI_Barrier(comm);
-    }
-#endif
-    
-    return local_len;
-}
 
 int main(int argc, char *argv[])
 {
@@ -76,28 +17,8 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Rank 0 reads input file and block distributes
-    int len, *inp;
-    if (rank == 0)
-    {
-        // Load input file into array
-        std::ifstream file(argv[1]);
-
-        file >> len;
-        inp = (int *) malloc(len * sizeof(int));
-        for (int i = 0; i < len; i++)
-            file >> inp[i];
-
-#ifdef DEBUG
-        std::cout << len << std::endl;
-        for (int i = 0; i < len; i++)
-            std::cout << inp[i] << " ";
-        std::cout << std::endl;
-#endif
-    }
-
     int local_len, *local_inp;
-    local_len = distribute_array(inp, len, local_inp, MPI_COMM_WORLD);
-    free(inp);
+    local_len = distribute_input(argv[1], local_inp, MPI_COMM_WORLD);
 
     // Timing start
     double starttime = MPI_Wtime();
@@ -187,4 +108,89 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 
     if (new_len > 0)
         parallel_qsort(new_arr, new_len, seed, my_comm);
+}
+
+
+/**
+ * Read array from input file on rank 0 and block-distribute to all processes 
+ * in communicator.
+ * Each process gets either ceil(n/p) or floor(n/p) values.
+ * 
+ * @return local_inp (in-place)
+ * @return length of local_inp
+ */
+int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
+{
+    int p, rank;
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &rank);
+
+    int len, *inp;
+    if (rank == 0)
+    {
+        // Load input file into array
+        std::ifstream file(fname);
+
+        file >> len;
+        inp = (int *) malloc(len * sizeof(int));
+        for (int i = 0; i < len; i++)
+            file >> inp[i];
+
+#ifdef DEBUG_INP_READ
+        std::cout << len << std::endl;
+        for (int i = 0; i < len; i++)
+            std::cout << inp[i] << " ";
+        std::cout << std::endl;
+#endif
+    }
+
+
+    // Decide split counts
+    int counts[p], displs[p];
+    displs[0] = 0;
+    if (rank == 0)
+    {
+        for (int i = 0; i < p; i++)
+        {
+            counts[i] = (len / p) + (i < (len % p));
+            displs[i+1] = displs[i] + counts[i];
+        }
+    }
+
+
+    // Communicate lengths, create buffers, and copy data
+    int local_len;
+    MPI_Scatter(
+        (int *) counts, 1, MPI_INT, 
+        &local_len, 1, MPI_INT, 
+        ROOT, comm
+    );
+
+    local_inp = (int *) malloc(local_len * sizeof(int));
+
+    MPI_Scatterv(
+        (void *) inp, (int *) counts, (int *) displs, MPI_INT,
+        (void *) local_inp, local_len, MPI_INT,
+        ROOT, comm
+    );
+
+    if (rank == 0)
+        free(inp);
+
+#ifdef DEBUG_BLOCK_DIST
+    for (int i = 0; i < p; i++)
+    {
+        if (i == rank)
+        {
+            std::cout << "Rank " << i << ": ";
+            for (int j = 0; j < local_len; j++)
+                std::cout << local_inp[j] << " ";
+            std::cout << std::endl;
+        }
+
+        MPI_Barrier(comm);
+    }
+#endif
+    
+    return local_len;
 }
