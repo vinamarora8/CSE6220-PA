@@ -29,10 +29,40 @@ int main(int argc, char *argv[])
     // TODO
 }
 
+// A helper function to swap two elements
+void swap(int* a, int* b) {
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
 
+// A helper function to partition the array around a pivot
+int partition(int *arr, int low, int high) {
+    int pivot = arr[high];
+    int i = low - 1;
+    for (int j = low; j <= high - 1; j++) {
+        if (arr[j] < pivot) {
+            i++;
+            swap(&arr[i], &arr[j]);
+        }
+    }
+    swap(&arr[i + 1], &arr[high]);
+    return (i + 1);
+}
+
+// The main Quick Sort function
+void quick_sort(int *arr, int low, int high) {
+    if (low < high) {
+        int pi = partition(arr, low, high);
+        quick_sort(arr, low, pi - 1);
+        quick_sort(arr, pi + 1, high);
+    }
+}
+
+// Serial sort
 int serial_sort(int *inp, int len)
 {
-    // TODO
+    quick_sort(inp, 0, len - 1);
 }
 
 
