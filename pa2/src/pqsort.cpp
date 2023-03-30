@@ -18,12 +18,12 @@ int main(int argc, char *argv[])
     int local_len, *local_inp;
 
     // Timing start
-    // TODO
+    double starttime = MPI_Wtime();
 
     parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
 
     // Timing end
-    // TODO
+    double runtime = MPI_Wtime() - starttime;
 
     // Print to output file
     // TODO
