@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <mpi.h>
 
 int serial_sort(int *inp, int len);
@@ -6,10 +7,15 @@ int parallel_qsort(int *inp, int len, MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
+    char *inp_fname = argv[1];
+    char *out_fname = argv[2];
+
+    int p, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     // Rank 0 reads input file and block distributes
-    // TODO
-    int local_len;
-    int local_inp[local_size];
+    int local_len, *local_inp;
 
     // Timing start
     // TODO
