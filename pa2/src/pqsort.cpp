@@ -60,6 +60,14 @@ void serial_sort(int *arr, int low, int high) {
     }
 }
 
+// Computes the number of overlaps between two ranges.
+int count_overlaps(int start1, int end1, int start2, int end2) {
+    int max_start = std::max(start1, start2);
+    int min_end = std::min(end1, end2);
+    int overlap_count = std::max(0, min_end - max_start + 1);
+    return overlap_count;
+}
+
 int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 {
 
@@ -116,6 +124,7 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     MPI_Comm_split(comm, is_lower_half, rank, &my_comm);
 
     // Calculate lengths of the new array
+    int new_len, new_global_len;
     if(is_lower_half == 1){
         new_global_len = sum_low;
         new_len = sum_low/p_low + (rank < (sum_low % p_low));
@@ -126,29 +135,30 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     }
 
     // Compute displacements, send and receive based on lower half or higher half
-    int new_len, new_global_len;
     int *sdispls = new int[p], *rdispls = new int[p]; 
     int *scounts = new int[p], *rcounts = new int[p];
+    // scount
     for(int i = 0; i < p; i++){
-        // Sends lower half elements
-        if(i < p_low && local_low_len > 0){
-            if(i <= rank){
-                if(sum_low_elements[i] > prefix_sum_low[i]){
-                    scounts[i] = std::min(sum_low_elements[i] - prefix_sum_low[i], local_low_len);
-                    local_low_len -= scounts[i];
-                }
-            }
-            else if(i > rank){
-                if(prefix_sum_low[rank] + local_low_len > sum_low_elements[rank]){
-                    scounts[i] = std::max(num_elements[i], local_low_len);
-                    local_low_len -= scounts[i];
-                }
-            }
+        // Send low elements
+        if(i < p_low){
+            int low_avail_start = prefix_sum_low[i];
+            int low_avail_end = low_avail_start + local_low_len - 1;
+            int low_req_start = prefix_sum_elements[i];
+            int low_req_end = low_req_start + num_elements[i];
+            scounts[i] = count_overlaps(low_avail_start, low_avail_end, low_req_start, low_req_end);
         }
-        // Sends upper half elements
-        else if(i >= p_low && local_high_len > 0){
+        // Send high elements
+        else {
+            int high_avail_start = prefix_sum_high[i];
+            int high_avail_end = high_avail_start + local_high_len - 1;
+            int high_req_start = prefix_sum_elements[i] - sum_low;
+            int high_req_end = high_req_start + num_elements[i];
+            scounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
+        }
+    }
+    // rcount
+    for(int i = 0; i < p; i++){
 
-        }
     }
     
     // All-to-all Communication to split the data into high and low
