@@ -7,7 +7,7 @@
 
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm);
-int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm);
+int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Comm comm);
 void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm);
 
 int main(int argc, char *argv[])
@@ -22,13 +22,13 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Rank 0 reads input file and block distributes
-    int local_len, *local_inp;
-    local_len = distribute_input(in_fname, local_inp, MPI_COMM_WORLD);
+    int local_len, *local_inp, global_len;
+    local_len = distribute_input(in_fname, local_inp, &global_len, MPI_COMM_WORLD);
 
     // Timing start
     double starttime = MPI_Wtime();
 
-    parallel_qsort(local_inp, local_len, 10, 4, MPI_COMM_WORLD);
+    parallel_qsort(local_inp, local_len, global_len, 4, MPI_COMM_WORLD);
 
     // Timing end
     double runtime = (MPI_Wtime() - starttime) * 1000.0;
@@ -213,7 +213,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
  * @return local_inp (in-place)
  * @return length of local_inp
  */
-int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm)
+int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Comm comm)
 {
     int p, rank;
     MPI_Comm_size(comm, &p);
@@ -240,6 +240,9 @@ int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm)
 #endif
     }
 
+    // Broadcast global length
+    *global_len = len;
+    MPI_Bcast(global_len, 1, MPI_INT, ROOT, comm);
 
     // Decide split counts
     int counts[p], displs[p];
@@ -251,7 +254,6 @@ int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm)
             displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
         }
     }
-
 
     // Communicate lengths, create buffers, and copy data
     int local_len;
