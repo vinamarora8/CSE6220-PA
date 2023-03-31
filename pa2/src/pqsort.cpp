@@ -76,28 +76,155 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     int pivot;
 
     // Local partition, and count sizes
-    // TODO
-    int *local_low, *local_high;
-    int local_low_len, local_high_len;
+    int local_low_len = 0, local_high_len = 0;
+
+    int i = - 1;
+    for (int j = 0; j <= len-1; j++) { 
+        if (inp[j] <= pivot) {
+            i++;
+            local_low_len++;
+            std::swap(inp[i], inp[j]);
+        }
+        else{
+            local_high_len++;
+        }
+    }
 
     // All-gather on lengths
     // TODO
     int low_len[p], high_len[p];
 
     // Compute low/high partitions and how many procs to assign for each
-    // Create new communicators
-    // TODO
     int p_low, p_high;
-    MPI_Comm comm_low, comm_high;
+    int sum_low = 0, sum_high = 0;
+    for (int i = 0; i < p; i++) {
+        sum_low += low_len[i]; 
+        sum_high += high_len[i];
+    }
+    p_low = std::round(static_cast<float>(sum_low * p) / (sum_high + sum_low));
+    p_high = p - p_low;
+    // Make sure no problem is left empty
+    if(p_high == 0) {
+        p_high += 1;
+        p_low -= 1;
+    }
+    if(p_low == 0) {
+        p_low += 1;
+        p_high -= 1;
+    }
 
-    // Compute communication indices + All-to-all
-    // TODO
-    int new_low_len, new_high_len;
-    int *new_low, *new_high;
+    int is_lower_half = rank < p_low;
+
+    // Split into different communicator
+    MPI_Comm my_comm;
+    MPI_Comm_split(comm, is_lower_half, rank, &my_comm);
+
+    // Compute displacements, send and receive based on lower half or higher half
+    int new_len, new_global_len;
+    int *sdispls = new int[p], *rdispls = new int[p]; 
+    int *scounts = new int[p], *rcounts = new int[p];
+    if(is_lower_half == 1){
+        new_global_len = sum_low;
+        new_len = sum_low/p_low + (rank < (sum_low % p_low));
+    }
+    else {
+        new_global_len = sum_high;
+        new_len = sum_high/p_high + (rank < (sum_high % p_high));
+    }
+    
+    // All-to-all Communication to split the data into high and low
+    MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, inp, rcounts, rdispls, MPI_INT, comm);
 
     // Compute new seeds
     int seed_low, seed_high;
 
-    parallel_qsort(new_low, new_low_len, seed_low, comm_low);
-    parallel_qsort(new_high, new_high_len, seed_high, comm_high);
+    if(new_len){
+        parallel_qsort(inp, new_len, new_global_len, seed_low, my_comm);
+    }
 }
+
+
+/**
+ * Read array from input file on rank 0 and block-distribute to all processes 
+ * in communicator.
+ * Each process gets either ceil(n/p) or floor(n/p) values.
+ * 
+ * @return local_inp (in-place)
+ * @return length of local_inp
+ */
+int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
+{
+    int p, rank;
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &rank);
+
+    int len, *inp;
+    if (rank == 0)
+    {
+        // Load input file into array
+        std::ifstream file(fname);
+
+        file >> len;
+        inp = (int *) malloc(len * sizeof(int));
+        for (int i = 0; i < len; i++)
+            file >> inp[i];
+
+#ifdef DEBUG_INP_READ
+        std::cout << len << std::endl;
+        for (int i = 0; i < len; i++)
+            std::cout << inp[i] << " ";
+        std::cout << std::endl;
+#endif
+    }
+
+
+    // Decide split counts
+    int counts[p], displs[p];
+    displs[0] = 0;
+    if (rank == 0)
+    {
+        for (int i = 0; i < p; i++)
+        {
+            counts[i] = (len / p) + (i < (len % p));
+            displs[i+1] = displs[i] + counts[i];
+        }
+    }
+
+
+    // Communicate lengths, create buffers, and copy data
+    int local_len;
+    MPI_Scatter(
+        (int *) counts, 1, MPI_INT, 
+        &local_len, 1, MPI_INT, 
+        ROOT, comm
+    );
+
+    local_inp = (int *) malloc(local_len * sizeof(int));
+
+    MPI_Scatterv(
+        (void *) inp, (int *) counts, (int *) displs, MPI_INT,
+        (void *) local_inp, local_len, MPI_INT,
+        ROOT, comm
+    );
+
+    if (rank == 0)
+        free(inp);
+
+#ifdef DEBUG_BLOCK_DIST
+    for (int i = 0; i < p; i++)
+    {
+        if (i == rank)
+        {
+            std::cout << "Rank " << i << ": ";
+            for (int j = 0; j < local_len; j++)
+                std::cout << local_inp[j] << " ";
+            std::cout << std::endl;
+        }
+
+        MPI_Barrier(comm);
+    }
+#endif
+    
+    return local_len;
+}
+
