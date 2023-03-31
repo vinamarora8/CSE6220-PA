@@ -104,7 +104,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     for (int j = 0; j <= len-1; j++) { 
         if (inp[j] <= pivot) {
             i++;
-            local_low_len++;
+            local_low_len++; // can be used instead of i
             std::swap(inp[i], inp[j]);
         }
         else{
@@ -129,7 +129,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     int *new_arr, new_len;
 
     // Compute new seeds
-    int seed_low, seed_high;
+    int seed = srand(time(0));
 
     if (new_len > 0)
         parallel_qsort(new_arr, new_len, seed, my_comm);
