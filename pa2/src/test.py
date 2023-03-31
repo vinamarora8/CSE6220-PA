@@ -61,8 +61,4 @@ op_fname = "o.txt"
 gen_input(size, ip_fname, log)
 run_prog(ip_fname, op_fname, num_procs)
 time = check_output(op_fname, log)
-<<<<<<< HEAD
 print(f'time: {time}ms')
-=======
-print(f'{time}')
->>>>>>> pratiksha

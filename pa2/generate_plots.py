@@ -5,20 +5,18 @@ import os
 import random 
 import time
 
-script_path = sys.argv[1]
-
 def get_times():
 
     # problem size 
     
 
-    n = np.logspace(3, 10, num=8, base=2)
+    n = np.logspace(3, 10, num=8, base=2).astype(int)
 
     for m in n:
         
         # generate wrt to power of 2
         num=int(np.log2(int(m)))
-        processors = np.logspace(1, num-1, num=(num-1), base=2)
+        processors = np.logspace(1, num-1, num=(num-1), base=2).astype(int)
         
         exe_times = []
         for p in processors:    
