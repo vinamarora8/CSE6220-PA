@@ -8,49 +8,7 @@
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
 int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm);
-
-void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm)
-{
-    int p, rank;
-    MPI_Comm_size(comm, &p);
-    MPI_Comm_rank(comm, &rank);
-
-    int total_len;
-    int counts[p], displs[p];
-
-    // Gather total length, counts, and compute displacements
-    MPI_Reduce(&local_len, &total_len, 1, MPI_INT, MPI_SUM, ROOT, comm);
-    MPI_Gather(
-        &local_len, 1, MPI_INT,
-        (void *) counts, 1, MPI_INT,
-        ROOT, comm
-    );
-    if (rank == ROOT)
-        for (int i = 0; i < p; i++)
-            displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
-
-    // Gather outputs
-    int *comb_array = (int *) malloc(total_len * sizeof(int));
-    MPI_Gatherv(
-        local_arr, local_len, MPI_INT,
-        comb_array, counts, displs, MPI_INT,
-        ROOT, comm
-    );
-
-    if (rank == ROOT)
-    {
-        for (int i = 0; i < total_len; i++)
-        {
-            std::cout << comb_array[i] << " ";
-            fstream << comb_array[i] << " ";
-        }
-        std::cout << std::endl;
-        fstream << std::endl;
-    }
-
-    free(comb_array);
-}
-
+void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
@@ -243,5 +201,51 @@ int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm)
 #endif
     
     return local_len;
+}
+
+
+/**
+ * Gather final arrays from all processors and write to fstream
+ */
+void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm)
+{
+    int p, rank;
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &rank);
+
+    int total_len;
+    int counts[p], displs[p];
+
+    // Gather total length, counts, and compute displacements
+    MPI_Reduce(&local_len, &total_len, 1, MPI_INT, MPI_SUM, ROOT, comm);
+    MPI_Gather(
+        &local_len, 1, MPI_INT,
+        (void *) counts, 1, MPI_INT,
+        ROOT, comm
+    );
+    if (rank == ROOT)
+        for (int i = 0; i < p; i++)
+            displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
+
+    // Gather outputs
+    int *comb_array = (int *) malloc(total_len * sizeof(int));
+    MPI_Gatherv(
+        local_arr, local_len, MPI_INT,
+        comb_array, counts, displs, MPI_INT,
+        ROOT, comm
+    );
+
+    if (rank == ROOT)
+    {
+        for (int i = 0; i < total_len; i++)
+        {
+            std::cout << comb_array[i] << " ";
+            fstream << comb_array[i] << " ";
+        }
+        std::cout << std::endl;
+        fstream << std::endl;
+    }
+
+    free(comb_array);
 }
 
