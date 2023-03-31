@@ -3,31 +3,40 @@
 #include <fstream>
 #include <mpi.h>
 
-int serial_sort(int *inp, int len);
-int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
+#define ROOT 0
+
+void serial_sort(int *inp, int low, int high);
+void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
+int distribute_input(const char *fname, int *local_inp, MPI_Comm comm);
+
 
 int main(int argc, char *argv[])
 {
-    char *inp_fname = argv[1];
-    char *out_fname = argv[2];
-
     int p, rank;
+    MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Rank 0 reads input file and block distributes
     int local_len, *local_inp;
+    local_len = distribute_input(argv[1], local_inp, MPI_COMM_WORLD);
 
     // Timing start
     double starttime = MPI_Wtime();
 
-    parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
+    //parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
 
     // Timing end
     double runtime = MPI_Wtime() - starttime;
 
     // Print to output file
-    // TODO
+    if (rank == 0)
+    {
+        char *out_fname = argv[2];
+    }
+
+    MPI_Finalize();
+    return 0;
 }
 
 // A helper function to swap two elements
@@ -76,7 +85,7 @@ void exclusive_prefix_sum(const int* in, int* out, int size) {
     }
 }
 
-int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
+void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 {
 
     int p, rank;
@@ -222,7 +231,6 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
         parallel_qsort(inp, new_len, new_global_len, seed_low, my_comm);
     }
 }
-
 
 /**
  * Read array from input file on rank 0 and block-distribute to all processes 
