@@ -41,7 +41,7 @@ def check_output(fname, log=False):
 
 
 def run_prog(ip_fname, op_fname, num_procs):
-    cmd = f'mpirun -np {num_procs} pqsort {ip_fname} {op_fname}'
+    cmd = f'mpirun -np {num_procs} ./pqsort {ip_fname} {op_fname}'
     os.system(cmd)
 
 
@@ -61,4 +61,4 @@ op_fname = "o.txt"
 gen_input(size, ip_fname, log)
 run_prog(ip_fname, op_fname, num_procs)
 time = check_output(op_fname, log)
-print(f'time: {time}')
+print(f'time: {time}ms')
