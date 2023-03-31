@@ -12,7 +12,7 @@
 //#define DEBUG_BLOCK_DIST
 
 void serial_sort(int *inp, int low, int high);
-void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm);
+void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm);
 int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Comm comm);
 void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm);
 
@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     // Timing start
     double starttime = MPI_Wtime();
 
-    parallel_qsort(local_inp, local_len, global_len, 4, MPI_COMM_WORLD);
+    parallel_qsort(local_inp, local_len, global_len, 0, MPI_COMM_WORLD);
 
     // Timing end
     double runtime = (MPI_Wtime() - starttime) * 1000.0;
@@ -123,7 +123,7 @@ std::string arrayToString(int* arr, int size) {
   return ss.str();
 }
 
-void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
+void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm)
 {
 
     int p, rank;
@@ -132,7 +132,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
 
     if (p == 1)
     {
-        serial_sort(inp, 0, len - 1);
+        serial_sort(inp, 0, len-1);
         return;
     }
 
@@ -298,7 +298,8 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
         rdispls[i] = sum_displ;
         sum_displ += rcounts[i]; 
     }
-    // Debug displays
+
+#ifdef DEBUG_ALLTOALL
     std::printf("Rank is %d, pivot is %d, p_low: %d, p_high: %d\n", rank, pivot, p_low, p_high);
     std::printf("Rank:%d, inp: %s\n", rank, arrayToString(inp, len).c_str());
     std::printf("Rank:%d, low_len: %s\n", rank, arrayToString(low_len, p).c_str());
@@ -310,17 +311,27 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     std::printf("Rank:%d, rcounts: %s\n", rank, arrayToString(rcounts, p).c_str());
     std::printf("Rank:%d, sdispls: %s\n", rank, arrayToString(sdispls, p).c_str());
     std::printf("Rank:%d, rdispls: %s\n", rank, arrayToString(rdispls, p).c_str());
+#endif
 
     // All-to-all Communication to split the data into high and low
     int *new_inp = new int[new_len];
     MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, new_inp, rcounts, rdispls, MPI_INT, comm);
+
+#ifdef DEBUG_ALLTOALL
     std::printf("Rank:%d, after_inp: %s\n", rank, arrayToString(new_inp, new_len).c_str());
+#endif
+
+    free(inp);
+    delete[] rcounts;
+    delete[] rdispls;
+    delete[] scounts;
+    delete[] sdispls;
+
     inp = new_inp;
-    // Compute new seeds
-    int new_seed = std::rand();
+    len = new_len;
 
     if(new_len){
-        parallel_qsort(new_inp, new_len, new_global_len, new_seed, my_comm);
+        parallel_qsort(inp, len, new_global_len, std::rand(), my_comm);
     }
 }
 
@@ -447,10 +458,10 @@ void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Co
     {
         for (int i = 0; i < total_len; i++)
         {
-            std::cout << comb_array[i] << " ";
+            //std::cout << comb_array[i] << " ";
             fstream << comb_array[i] << " ";
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
         fstream << std::endl;
     }
 
