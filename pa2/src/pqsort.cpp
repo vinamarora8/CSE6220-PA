@@ -4,36 +4,42 @@
 #include <mpi.h>
 
 #define ROOT 0
+//#define DEBUG_BLOCK_DIST
 
 void serial_sort(int *inp, int low, int high);
-void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
-int distribute_input(const char *fname, int *local_inp, MPI_Comm comm);
-
+void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm);
+int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Comm comm);
+void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
+
+    char *in_fname = argv[1];
+    char *op_fname = argv[2];
+
     int p, rank;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Rank 0 reads input file and block distributes
-    int local_len, *local_inp;
-    local_len = distribute_input(argv[1], local_inp, MPI_COMM_WORLD);
+    int local_len, *local_inp, global_len;
+    local_len = distribute_input(in_fname, local_inp, &global_len, MPI_COMM_WORLD);
 
     // Timing start
     double starttime = MPI_Wtime();
 
-    //parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
+    parallel_qsort(local_inp, local_len, global_len, 4, MPI_COMM_WORLD);
 
     // Timing end
-    double runtime = MPI_Wtime() - starttime;
+    double runtime = (MPI_Wtime() - starttime) * 1000.0;
 
     // Print to output file
-    if (rank == 0)
-    {
-        char *out_fname = argv[2];
-    }
+    std::ofstream opfile;
+    if (rank == ROOT) opfile.open(argv[2]);
+    gather_output(local_inp, local_len, opfile, MPI_COMM_WORLD);
+    if (rank == ROOT) opfile << std::fixed << std::setprecision(6) << runtime << std::endl;
+    if (rank == ROOT) opfile.close();
 
     MPI_Finalize();
     return 0;
@@ -85,6 +91,21 @@ void exclusive_prefix_sum(const int* in, int* out, int size) {
     }
 }
 
+/**
+ * Compute lowest global_index in rank given world size p and array length
+*/
+int global_index_low(int global_len, int p, int rank)
+{
+    int ans = rank * (global_len / p);
+
+    if (rank < (global_len % p))
+        ans += rank;
+    else
+        ans += global_len % p;
+    
+    return ans;
+}
+
 void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 {
 
@@ -95,11 +116,36 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     if (p == 1)
     {
         serial_sort(inp, 0, len - 1);
+        return;
     }
 
     // Choose pivot (random, with same seed) and broadcast
-    // TODO
-    int pivot;
+    std::srand(seed);
+
+    int pivot_index = std::rand() % global_len;
+    int pivot = -1;
+
+    // find which processor has the pivot, broadcast to all
+    int pivot_rank;
+    for (pivot_rank = 0; pivot_rank < p; pivot_rank++)
+    {
+        if (global_index_low(global_len, p, pivot_rank) <= pivot_index 
+            && global_index_low(global_len, p, pivot_rank+1) > pivot_index)
+            break;
+    }
+    if (rank == pivot_rank)
+        pivot = inp[pivot_index - global_index_low(global_len, p, rank)];
+    MPI_Bcast(&pivot, 1, MPI_INT, pivot_rank, comm);
+
+#ifdef DEBUG
+    if (rank == 0)
+    {
+        std::cout << "Pivot_idx: " << pivot_index << std::endl;
+        std::cout << "Pivot_rank: " << pivot_rank << std::endl;
+        std::cout << "Pivot: " << pivot << std::endl;
+    }
+#endif
+
 
     // Local partition, and count sizes
     int local_low_len = 0, local_high_len = 0;
@@ -118,7 +164,11 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 
     // All-gather on lengths
     // TODO
-    int low_len[p], high_len[p];
+    int* low_len = new int[p];
+    int* high_len = new int[p];
+
+    MPI_Allgather(&local_low_len, 1, MPI_INT, low_len, 1, MPI_INT, comm);
+    MPI_Allgather(&local_high_len, 1, MPI_INT, high_len, 1, MPI_INT, comm);
 
     // Compute low/high partitions and how many procs to assign for each
     int p_low, p_high;
@@ -228,7 +278,7 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     int new_seed = std::rand();
 
     if(new_len){
-        parallel_qsort(inp, new_len, new_global_len, seed_low, my_comm);
+        parallel_qsort(inp, new_len, new_global_len, new_seed, my_comm);
     }
 }
 
@@ -240,7 +290,7 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
  * @return local_inp (in-place)
  * @return length of local_inp
  */
-int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
+int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Comm comm)
 {
     int p, rank;
     MPI_Comm_size(comm, &p);
@@ -252,10 +302,12 @@ int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
         // Load input file into array
         std::ifstream file(fname);
 
-        file >> len;
+        file >> len; // first line is length of array
+        // remaining lines are the array separated by spaces
         inp = (int *) malloc(len * sizeof(int));
         for (int i = 0; i < len; i++)
             file >> inp[i];
+        file.close();
 
 #ifdef DEBUG_INP_READ
         std::cout << len << std::endl;
@@ -265,19 +317,20 @@ int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
 #endif
     }
 
+    // Broadcast global length
+    *global_len = len;
+    MPI_Bcast(global_len, 1, MPI_INT, ROOT, comm);
 
     // Decide split counts
     int counts[p], displs[p];
-    displs[0] = 0;
     if (rank == 0)
     {
         for (int i = 0; i < p; i++)
         {
             counts[i] = (len / p) + (i < (len % p));
-            displs[i+1] = displs[i] + counts[i];
+            displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
         }
     }
-
 
     // Communicate lengths, create buffers, and copy data
     int local_len;
@@ -314,5 +367,51 @@ int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
 #endif
     
     return local_len;
+}
+
+
+/**
+ * Gather final arrays from all processors and write to fstream
+ */
+void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm)
+{
+    int p, rank;
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &rank);
+
+    int total_len;
+    int counts[p], displs[p];
+
+    // Gather total length, counts, and compute displacements
+    MPI_Reduce(&local_len, &total_len, 1, MPI_INT, MPI_SUM, ROOT, comm);
+    MPI_Gather(
+        &local_len, 1, MPI_INT,
+        (void *) counts, 1, MPI_INT,
+        ROOT, comm
+    );
+    if (rank == ROOT)
+        for (int i = 0; i < p; i++)
+            displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
+
+    // Gather outputs
+    int *comb_array = (int *) malloc(total_len * sizeof(int));
+    MPI_Gatherv(
+        local_arr, local_len, MPI_INT,
+        comb_array, counts, displs, MPI_INT,
+        ROOT, comm
+    );
+
+    if (rank == ROOT)
+    {
+        for (int i = 0; i < total_len; i++)
+        {
+            std::cout << comb_array[i] << " ";
+            fstream << comb_array[i] << " ";
+        }
+        std::cout << std::endl;
+        fstream << std::endl;
+    }
+
+    free(comb_array);
 }
 
