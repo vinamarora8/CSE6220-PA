@@ -104,24 +104,12 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
 
 
     // Local partition, and count sizes
-<<<<<<< HEAD
-    // TODO
-=======
->>>>>>> saneens
     int local_low_len = 0, local_high_len = 0;
 
     int i = - 1;
     for (int j = 0; j <= len-1; j++) { 
         if (inp[j] <= pivot) {
             i++;
-<<<<<<< HEAD
-            std::swap(inp[i], inp[j]);
-        }
-    }
-
-    local_low_len = i;
-    local_high_len = len - i;
-=======
             local_low_len++;
             std::swap(inp[i], inp[j]);
         }
@@ -129,26 +117,17 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
             local_high_len++;
         }
     }
->>>>>>> saneens
 
     // All-gather on lengths
     // TODO
     int* low_len = new int[p];
     int* high_len = new int[p];
-    int new_global_len;
 
     MPI_Allgather(&local_low_len, 1, MPI_INT, low_len, 1, MPI_INT, comm);
     MPI_Allgather(&local_high_len, 1, MPI_INT, high_len, 1, MPI_INT, comm);
 
     // Compute low/high partitions and how many procs to assign for each
     int p_low, p_high;
-<<<<<<< HEAD
-    MPI_Comm comm_low, comm_high, my_comm;
-
-    // Compute communication indices + All-to-all
-    // TODO
-    int *new_arr, new_len;
-=======
     int sum_low = 0, sum_high = 0;
     for (int i = 0; i < p; i++) {
         sum_low += low_len[i]; 
@@ -187,19 +166,13 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     
     // All-to-all Communication to split the data into high and low
     MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, inp, rcounts, rdispls, MPI_INT, comm);
->>>>>>> saneens
 
     // Compute new seeds
     int new_seed = std::rand();
 
-<<<<<<< HEAD
-    if (new_len > 0)
-        parallel_qsort(new_arr, new_len, new_global_len, new_seed, my_comm);
-=======
     if(new_len){
-        parallel_qsort(inp, new_len, new_global_len, seed_low, my_comm);
+        parallel_qsort(inp, new_len, new_global_len, new_seed, my_comm);
     }
->>>>>>> saneens
 }
 
 
@@ -211,11 +184,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
  * @return local_inp (in-place)
  * @return length of local_inp
  */
-<<<<<<< HEAD
 int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm)
-=======
-int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
->>>>>>> saneens
 {
     int p, rank;
     MPI_Comm_size(comm, &p);
@@ -227,19 +196,12 @@ int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
         // Load input file into array
         std::ifstream file(fname);
 
-<<<<<<< HEAD
         file >> len; // first line is length of array
         // remaining lines are the array separated by spaces
         inp = (int *) malloc(len * sizeof(int));
         for (int i = 0; i < len; i++)
             file >> inp[i];
         file.close();
-=======
-        file >> len;
-        inp = (int *) malloc(len * sizeof(int));
-        for (int i = 0; i < len; i++)
-            file >> inp[i];
->>>>>>> saneens
 
 #ifdef DEBUG_INP_READ
         std::cout << len << std::endl;
@@ -252,20 +214,12 @@ int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
 
     // Decide split counts
     int counts[p], displs[p];
-<<<<<<< HEAD
-=======
-    displs[0] = 0;
->>>>>>> saneens
     if (rank == 0)
     {
         for (int i = 0; i < p; i++)
         {
             counts[i] = (len / p) + (i < (len % p));
-<<<<<<< HEAD
             displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
-=======
-            displs[i+1] = displs[i] + counts[i];
->>>>>>> saneens
         }
     }
 
@@ -307,7 +261,6 @@ int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
     return local_len;
 }
 
-<<<<<<< HEAD
 
 /**
  * Gather final arrays from all processors and write to fstream
@@ -354,5 +307,3 @@ void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Co
     free(comb_array);
 }
 
-=======
->>>>>>> saneens
