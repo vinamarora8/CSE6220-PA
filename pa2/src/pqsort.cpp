@@ -93,7 +93,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     if ( (pivot_index >= rank * global_len / p ) && (pivot_index < (rank + 1) * global_len / p) ) {
         pivot = inp[pivot_index];
     }
-    MPI_Bcast(&pivot, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&pivot, 1, MPI_INT, rank, comm);
 
 
     // Local partition, and count sizes
@@ -104,19 +104,20 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     for (int j = 0; j <= len-1; j++) { 
         if (inp[j] <= pivot) {
             i++;
-            local_low_len++; // can be used instead of i
             std::swap(inp[i], inp[j]);
-        }
-        else{
-            local_high_len++;
         }
     }
 
+    local_low_len = i;
+    local_high_len = len - i;
+
     // All-gather on lengths
     // TODO
-    int low_len[p], high_len[p];
-    MPI_Allgather(&local_low_len, 1, MPI_INT, &low_len[rank], 1, MPI_INT, MPI_COMM_WORLD);
-    MPI_Allgather(&local_high_len, 1, MPI_INT, &high_len[rank], 1, MPI_INT, MPI_COMM_WORLD);
+    int* low_len = new int[p];
+    int* high_len = new int[p];
+
+    MPI_Allgather(&local_low_len, 1, MPI_INT, low_len, 1, MPI_INT, comm);
+    MPI_Allgather(&local_high_len, 1, MPI_INT, high_len, 1, MPI_INT, comm);
 
     // Compute low/high partitions and how many procs to assign for each
     // Create new communicators

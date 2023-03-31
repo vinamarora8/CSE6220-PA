@@ -15,6 +15,7 @@ def get_times():
     n = np.logspace(32, 1048576, 2)
 
     for m in n:
+        
         # generate wrt to power of 2
 
         processors = np.logspace(1, (m/2), 2)
@@ -33,6 +34,7 @@ def get_times():
 
             print(cmd_base)
 
+            # add start, end time calculation in cpp and redirect them to tmp
             start_time = time.time()
             os.system(cmd_base)
             end_time = time.time()
