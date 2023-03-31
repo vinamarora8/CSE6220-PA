@@ -1,6 +1,11 @@
 #include <iostream>
 #include <algorithm>
+#include <cmath>
+#include <iomanip>
 #include <fstream>
+#include <cstdio>
+#include <string>
+#include <sstream>
 #include <mpi.h>
 
 #define ROOT 0
@@ -105,8 +110,20 @@ int global_index_low(int global_len, int p, int rank)
     
     return ans;
 }
+std::string arrayToString(int* arr, int size) {
+  std::stringstream ss;
+  ss << "[";
+  for (int i = 0; i < size; i++) {
+    ss << arr[i];
+    if (i < size - 1) {
+      ss << ", ";
+    }
+  }
+  ss << "]";
+  return ss.str();
+}
 
-void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
+void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
 {
 
     int p, rank;
@@ -202,7 +219,7 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     }
 
     // Num elements
-    int num_elements = new int[p];
+    int *num_elements = new int[p];
     for (int i = 0; i < p; i++) {
         if(i < p_low){
             num_elements[i] = sum_low/p_low + (i < (sum_low % p_low));
@@ -224,39 +241,49 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     int *scounts = new int[p], *rcounts = new int[p];
     // scount
     for(int i = 0; i < p; i++){
+        scounts[i] = 0;
         // Send low elements
         if(i < p_low){
             int low_avail_start = prefix_sum_low[rank];
             int low_avail_end = low_avail_start + local_low_len - 1;
             int low_req_start = prefix_sum_elements[i];
-            int low_req_end = low_req_start + num_elements[i];
-            scounts[i] = count_overlaps(low_avail_start, low_avail_end, low_req_start, low_req_end);
+            int low_req_end = low_req_start + num_elements[i] - 1;
+            if(low_req_start >= 0 && low_req_end >= 0 && low_avail_start >= 0 && low_avail_end >= 0){
+                scounts[i] = count_overlaps(low_avail_start, low_avail_end, low_req_start, low_req_end);
+            }
         }
         // Send high elements
         else {
             int high_avail_start = prefix_sum_high[rank];
             int high_avail_end = high_avail_start + local_high_len - 1;
             int high_req_start = prefix_sum_elements[i] - sum_low;
-            int high_req_end = high_req_start + num_elements[i];
-            scounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
+            int high_req_end = high_req_start + num_elements[i] - 1;
+            if(high_req_start >= 0 && high_req_end >= 0 && high_avail_start >= 0 && high_avail_end >= 0){
+                scounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
+            }
         }
     }
     // rcount
     for(int i = 0; i < p; i++){
+        rcounts[i] = 0;
         // Receive low elements
         if(rank < p_low){
             int low_req_start = prefix_sum_elements[rank];
-            int low_req_end = low_req_start + num_elements[rank];
+            int low_req_end = low_req_start + num_elements[rank] - 1;
             int low_avail_start = prefix_sum_low[i];
-            int low_avail_end = low_avail_start + local_low_len - 1;
-            rcounts[i] = count_overlaps(low_avail_start, low_avail_end, low_req_start, low_req_end);
+            int low_avail_end = low_avail_start + low_len[i] - 1;
+            if(low_req_start >= 0 && low_req_end >= 0 && low_avail_start >= 0 && low_avail_end >= 0){
+                rcounts[i] = count_overlaps(low_avail_start, low_avail_end, low_req_start, low_req_end);
+            }
         }
         else {
             int high_req_start = prefix_sum_elements[rank] - sum_low;
-            int high_req_end = high_req_start + num_elements[rank];
+            int high_req_end = high_req_start + num_elements[rank] - 1;
             int high_avail_start = prefix_sum_high[i];
-            int high_avail_end = high_avail_start + local_high_len - 1;
-            rcounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
+            int high_avail_end = high_avail_start + high_len[i] - 1;
+            if(high_req_start >= 0 && high_req_end >= 0 && high_avail_start >= 0 && high_avail_end >= 0){
+                rcounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
+            }
         }
     }
     // sdispls
@@ -270,15 +297,30 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     for(int i = 0; i < p; i++){
         rdispls[i] = sum_displ;
         sum_displ += rcounts[i]; 
-    }    
-    // All-to-all Communication to split the data into high and low
-    MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, inp, rcounts, rdispls, MPI_INT, comm);
+    }
+    // Debug displays
+    std::printf("Rank is %d, pivot is %d, p_low: %d, p_high: %d\n", rank, pivot, p_low, p_high);
+    std::printf("Rank:%d, inp: %s\n", rank, arrayToString(inp, len).c_str());
+    std::printf("Rank:%d, low_len: %s\n", rank, arrayToString(low_len, p).c_str());
+    std::printf("Rank:%d, high_len: %s\n", rank, arrayToString(high_len, p).c_str());
+    std::printf("Rank:%d, prefix_sum_low: %s\n", rank, arrayToString(prefix_sum_low, len).c_str());
+    std::printf("Rank:%d, prefix_sum_high: %s\n", rank, arrayToString(prefix_sum_high, len).c_str());
+    std::printf("Rank:%d, num_elements: %s\n", rank, arrayToString(num_elements, p).c_str());
+    std::printf("Rank:%d, scounts: %s\n", rank, arrayToString(scounts, p).c_str());
+    std::printf("Rank:%d, rcounts: %s\n", rank, arrayToString(rcounts, p).c_str());
+    std::printf("Rank:%d, sdispls: %s\n", rank, arrayToString(sdispls, p).c_str());
+    std::printf("Rank:%d, rdispls: %s\n", rank, arrayToString(rdispls, p).c_str());
 
+    // All-to-all Communication to split the data into high and low
+    int *new_inp = new int[new_len];
+    MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, new_inp, rcounts, rdispls, MPI_INT, comm);
+    std::printf("Rank:%d, after_inp: %s\n", rank, arrayToString(new_inp, new_len).c_str());
+    inp = new_inp;
     // Compute new seeds
     int new_seed = std::rand();
 
     if(new_len){
-        parallel_qsort(inp, new_len, new_global_len, new_seed, my_comm);
+        parallel_qsort(new_inp, new_len, new_global_len, new_seed, my_comm);
     }
 }
 
