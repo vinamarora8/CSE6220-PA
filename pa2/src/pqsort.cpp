@@ -158,7 +158,21 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     }
     // rcount
     for(int i = 0; i < p; i++){
-
+        // Receive low elements
+        if(rank < p_low){
+            int low_req_start = prefix_sum_elements[rank];
+            int low_req_end = low_req_start + num_elements[rank];
+            int low_avail_start = prefix_sum_low[i];
+            int low_avail_end = low_avail_start + local_low_len - 1;
+            rcounts[i] = count_overlaps(low_avail_start, low_avail_end, low_req_start, low_req_end);
+        }
+        else {
+            int high_req_start = prefix_sum_elements[rank] - sum_low;
+            int high_req_end = high_req_start + num_elements[rank];
+            int high_avail_start = prefix_sum_high[i];
+            int high_avail_end = high_avail_start + local_high_len - 1;
+            rcounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
+        }
     }
     
     // All-to-all Communication to split the data into high and low
