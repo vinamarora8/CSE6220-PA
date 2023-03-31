@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include <fstream>
 #include <mpi.h>
 
@@ -102,27 +103,19 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
         sum_high += high_len[i];
     }
     p_low = std::round(static_cast<float>(sum_low * p) / (sum_high + sum_low));
-    p_high = p - p_low;
     // Make sure no problem is left empty
-    if(p_high == 0) {
-        p_high += 1;
-        p_low -= 1;
-    }
-    if(p_low == 0) {
-        p_low += 1;
-        p_high -= 1;
-    }
+    p_low = std::min(p_low, p - 1);
+    p_low = std::max(p_low, 1);
+    p_high = p - p_low;
 
+    // Rank belongs to lower half
     int is_lower_half = rank < p_low;
-
+    
     // Split into different communicator
     MPI_Comm my_comm;
     MPI_Comm_split(comm, is_lower_half, rank, &my_comm);
 
-    // Compute displacements, send and receive based on lower half or higher half
-    int new_len, new_global_len;
-    int *sdispls = new int[p], *rdispls = new int[p]; 
-    int *scounts = new int[p], *rcounts = new int[p];
+    // Calculate lengths of the new array
     if(is_lower_half == 1){
         new_global_len = sum_low;
         new_len = sum_low/p_low + (rank < (sum_low % p_low));
@@ -130,6 +123,32 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     else {
         new_global_len = sum_high;
         new_len = sum_high/p_high + (rank < (sum_high % p_high));
+    }
+
+    // Compute displacements, send and receive based on lower half or higher half
+    int new_len, new_global_len;
+    int *sdispls = new int[p], *rdispls = new int[p]; 
+    int *scounts = new int[p], *rcounts = new int[p];
+    for(int i = 0; i < p; i++){
+        // Sends lower half elements
+        if(i < p_low && local_low_len > 0){
+            if(i <= rank){
+                if(sum_low_elements[i] > prefix_sum_low[i]){
+                    scounts[i] = std::min(sum_low_elements[i] - prefix_sum_low[i], local_low_len);
+                    local_low_len -= scounts[i];
+                }
+            }
+            else if(i > rank){
+                if(prefix_sum_low[rank] + local_low_len > sum_low_elements[rank]){
+                    scounts[i] = std::max(num_elements[i], local_low_len);
+                    local_low_len -= scounts[i];
+                }
+            }
+        }
+        // Sends upper half elements
+        else if(i >= p_low && local_high_len > 0){
+
+        }
     }
     
     // All-to-all Communication to split the data into high and low
