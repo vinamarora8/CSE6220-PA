@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     // Timing start
     double starttime = MPI_Wtime();
 
-    //parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
+    parallel_qsort(local_inp, local_len, 10, 4, MPI_COMM_WORLD);
 
     // Timing end
     double runtime = (MPI_Wtime() - starttime) * 1000.0;
@@ -74,6 +74,23 @@ void serial_sort(int *arr, int low, int high) {
     }
 }
 
+
+/**
+ * Compute lowest global_index in rank given world size p and array length
+*/
+int global_index_low(int global_len, int p, int rank)
+{
+    int ans = rank * (global_len / p);
+
+    if (rank < (global_len % p))
+        ans += rank;
+    else
+        ans += global_len % p;
+    
+    return ans;
+}
+
+
 void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
 {
 
@@ -88,19 +105,31 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     }
 
     // Choose pivot (random, with same seed) and broadcast
-    // TODO 
-    int pivot_index = -1;
+    std::srand(seed);
+
+    int pivot_index = std::rand() % global_len;
     int pivot = -1;
 
-    std::srand(seed);
-    pivot_index = std::rand() % global_len;
-
-    // find which processor has the pivot
-    int pivot_rank = -1;
-    if ( (pivot_index >= rank * global_len / p ) && (pivot_index < (rank + 1) * global_len / p) ) {
-        pivot = inp[pivot_index];
+    // find which processor has the pivot, broadcast to all
+    int pivot_rank;
+    for (pivot_rank = 0; pivot_rank < p; pivot_rank++)
+    {
+        if (global_index_low(global_len, p, pivot_rank) <= pivot_index 
+            && global_index_low(global_len, p, pivot_rank+1) > pivot_index)
+            break;
     }
-    MPI_Bcast(&pivot, 1, MPI_INT, rank, comm);
+    if (rank == pivot_rank)
+        pivot = inp[pivot_index - global_index_low(global_len, p, rank)];
+    MPI_Bcast(&pivot, 1, MPI_INT, pivot_rank, comm);
+
+#ifdef DEBUG
+    if (rank == 0)
+    {
+        std::cout << "Pivot_idx: " << pivot_index << std::endl;
+        std::cout << "Pivot_rank: " << pivot_rank << std::endl;
+        std::cout << "Pivot: " << pivot << std::endl;
+    }
+#endif
 
 
     // Local partition, and count sizes
