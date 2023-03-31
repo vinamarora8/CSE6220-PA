@@ -3,11 +3,11 @@
 #include <mpi.h>
 
 #define ROOT 0
-#define DEBUG_BLOCK_DIST
+//#define DEBUG_BLOCK_DIST
 
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
-int distribute_input(const char *fname, int *local_inp, MPI_Comm comm);
+int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm);
 
 void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm)
 {
@@ -45,6 +45,7 @@ void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Co
             fstream << comb_array[i] << " ";
         }
         std::cout << std::endl;
+        fstream << std::endl;
     }
 
     free(comb_array);
@@ -65,44 +66,7 @@ int main(int argc, char *argv[])
     // Rank 0 reads input file and block distributes
     int len, *inp;
     int local_len, *local_inp;
-    int counts[p], displs[p]; // only valid on rank 0
-
-    if (rank == 0)
-    {
-        // Load input file into array
-        std::ifstream file(in_fname);
-
-        file >> len; // first line is length of array
-        // remaining lines are the array separated by spaces
-        inp = (int *) malloc(len * sizeof(int));
-        for (int i = 0; i < len; i++)
-            file >> inp[i];
-        file.close();
-
-        // Decide split counts
-        for (int i = 0; i < p; i++)
-        {
-            counts[i] = (len / p) + (i < (len % p));
-            displs[i] = i == 0 ? 0 : displs[i-1] + counts[i-1];
-        }
-    }
-
-    // Communicate lengths, create buffers, and copy data
-    //int local_len;
-    MPI_Scatter(
-        (int *) counts, 1, MPI_INT, 
-        &local_len, 1, MPI_INT, 
-        0, MPI_COMM_WORLD
-    );
-    local_inp = (int *) malloc(local_len * sizeof(int));
-    MPI_Scatterv(
-        (void *) inp, (int *) counts, (int *) displs, MPI_INT,
-        (void *) local_inp, local_len, MPI_INT,
-        0, MPI_COMM_WORLD
-    );
-
-    if (rank == 0)
-        free(inp);
+    local_len = distribute_input(in_fname, local_inp, MPI_COMM_WORLD);
 
     // Timing start
     double starttime = MPI_Wtime();
@@ -110,13 +74,13 @@ int main(int argc, char *argv[])
     //parallel_qsort(local_inp, local_len, 0, MPI_COMM_WORLD);
 
     // Timing end
-    double runtime = MPI_Wtime() - starttime;
+    double runtime = (MPI_Wtime() - starttime) * 1000.0;
 
     // Print to output file
     std::ofstream opfile;
     if (rank == ROOT) opfile.open(argv[2]);
     gather_output(local_inp, local_len, opfile, MPI_COMM_WORLD);
-    if (rank == ROOT) opfile << std::endl << runtime << std::endl;
+    if (rank == ROOT) opfile << std::fixed << std::setprecision(6) << runtime << std::endl;
     if (rank == ROOT) opfile.close();
 
     MPI_Finalize();
@@ -204,7 +168,7 @@ void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
  * @return local_inp (in-place)
  * @return length of local_inp
  */
-int distribute_input(const char *fname, int *local_inp, MPI_Comm comm)
+int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm)
 {
     int p, rank;
     MPI_Comm_size(comm, &p);
