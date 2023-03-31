@@ -141,7 +141,7 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
     for(int i = 0; i < p; i++){
         // Send low elements
         if(i < p_low){
-            int low_avail_start = prefix_sum_low[i];
+            int low_avail_start = prefix_sum_low[rank];
             int low_avail_end = low_avail_start + local_low_len - 1;
             int low_req_start = prefix_sum_elements[i];
             int low_req_end = low_req_start + num_elements[i];
@@ -149,7 +149,7 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
         }
         // Send high elements
         else {
-            int high_avail_start = prefix_sum_high[i];
+            int high_avail_start = prefix_sum_high[rank];
             int high_avail_end = high_avail_start + local_high_len - 1;
             int high_req_start = prefix_sum_elements[i] - sum_low;
             int high_req_end = high_req_start + num_elements[i];
