@@ -12,13 +12,13 @@ def get_times():
     # problem size 
     
 
-    n = np.logspace(32, 1048576, 2)
+    n = np.logspace(3, 10, num=8, base=2)
 
     for m in n:
         
         # generate wrt to power of 2
-
-        processors = np.logspace(1, (m/2), 2)
+        num=int(np.log2(int(m)))
+        processors = np.logspace(1, num-1, num=(num-1), base=2)
         
         exe_times = []
         for p in processors:    
