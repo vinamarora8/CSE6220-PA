@@ -67,6 +67,14 @@ int count_overlaps(int start1, int end1, int start2, int end2) {
     int overlap_count = std::max(0, min_end - max_start + 1);
     return overlap_count;
 }
+// Computes the exclusive prefix sum of an array.
+void exclusive_prefix_sum(const int* in, int* out, int size) {
+    int sum = 0;
+    for (int i = 0; i < size; i++) {
+        out[i] = sum;
+        sum += in[i];
+    }
+}
 
 int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
 {
@@ -134,6 +142,24 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
         new_len = sum_high/p_high + (rank < (sum_high % p_high));
     }
 
+    // Num elements
+    int num_elements = new int[p];
+    for (int i = 0; i < p; i++) {
+        if(i < p_low){
+            num_elements[i] = sum_low/p_low + (i < (sum_low % p_low));
+        }
+        else{
+            num_elements[i] = sum_high/p_high + (i < (sum_high % p_high));
+        }
+    }
+    // Prefix sum calculations required
+    int *prefix_sum_elements = new int[p];
+    int *prefix_sum_low = new int[p];
+    int *prefix_sum_high = new int[p];
+    exclusive_prefix_sum(num_elements, prefix_sum_elements, p);
+    exclusive_prefix_sum(low_len, prefix_sum_low, p);
+    exclusive_prefix_sum(high_len, prefix_sum_high, p);
+
     // Compute displacements, send and receive based on lower half or higher half
     int *sdispls = new int[p], *rdispls = new int[p]; 
     int *scounts = new int[p], *rcounts = new int[p];
@@ -174,12 +200,23 @@ int parallel_qsort(int *inp, int len, int seed, MPI_Comm comm)
             rcounts[i] = count_overlaps(high_avail_start, high_avail_end, high_req_start, high_req_end);
         }
     }
-    
+    // sdispls
+    int sum_displ = 0;
+    for(int i = 0; i < p; i++){
+        sdispls[i] = sum_displ;
+        sum_displ += scounts[i]; 
+    }    
+    // rdispls
+    sum_displ = 0;
+    for(int i = 0; i < p; i++){
+        rdispls[i] = sum_displ;
+        sum_displ += rcounts[i]; 
+    }    
     // All-to-all Communication to split the data into high and low
     MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, inp, rcounts, rdispls, MPI_INT, comm);
 
     // Compute new seeds
-    int seed_low, seed_high;
+    int new_seed = std::rand();
 
     if(new_len){
         parallel_qsort(inp, new_len, new_global_len, seed_low, my_comm);
