@@ -6,7 +6,7 @@
 //#define DEBUG_BLOCK_DIST
 
 void serial_sort(int *inp, int low, int high);
-void parallel_qsort(int *inp, int len, int seed, MPI_Comm comm);
+void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm);
 int distribute_input(const char *fname, int *&local_inp, MPI_Comm comm);
 void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Comm comm);
 
@@ -22,7 +22,6 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Rank 0 reads input file and block distributes
-    int len, *inp;
     int local_len, *local_inp;
     local_len = distribute_input(in_fname, local_inp, MPI_COMM_WORLD);
 
@@ -85,6 +84,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     if (p == 1)
     {
         serial_sort(inp, 0, len - 1);
+        return;
     }
 
     // Choose pivot (random, with same seed) and broadcast
@@ -122,6 +122,7 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     // TODO
     int* low_len = new int[p];
     int* high_len = new int[p];
+    int new_global_len;
 
     MPI_Allgather(&local_low_len, 1, MPI_INT, low_len, 1, MPI_INT, comm);
     MPI_Allgather(&local_high_len, 1, MPI_INT, high_len, 1, MPI_INT, comm);
@@ -137,10 +138,10 @@ void parallel_qsort(int *inp, int len, int global_len, int seed, MPI_Comm comm)
     int *new_arr, new_len;
 
     // Compute new seeds
-    int seed = srand(time(0));
+    int new_seed = std::rand();
 
     if (new_len > 0)
-        parallel_qsort(new_arr, new_len, seed, my_comm);
+        parallel_qsort(new_arr, new_len, new_global_len, new_seed, my_comm);
 }
 
 
