@@ -5,8 +5,8 @@ import numpy as np
 import argparse
 
 def gen_input(size, op_fname, log=False):
-    int_min = -2**31
-    int_max = (2**31)-1
+    int_min = 0
+    int_max = 10
     nums = [random.randint(int_min, int_max) for _ in range(size)] 
 
     with open(op_fname, 'w') as f:
@@ -19,7 +19,7 @@ def gen_input(size, op_fname, log=False):
         print(f'inp : {nums}')
     return nums
 
-def check_output(fname, log=False):
+def check_output(fname, size, log=False):
     with open(fname) as f:
         text = f.readlines()
 
@@ -31,6 +31,7 @@ def check_output(fname, log=False):
     diff = arr[1:] - arr[:-1]
     check = (diff >= 0).all()
     assert check
+    assert size == len(nums), f'{size}, {len(nums)}'
 
     if log:
         print(f'out : {nums}')
@@ -59,5 +60,5 @@ if __name__ == "__main__":
 
     gen_input(size, ip_fname, log)
     run_prog(ip_fname, op_fname, num_procs)
-    time = check_output(op_fname, log)
+    time = check_output(op_fname, size, log)
     print(f'{time}')

@@ -10,6 +10,8 @@
 
 #define ROOT 0
 //#define DEBUG_BLOCK_DIST
+//#define DEBUG_ALLTOALL
+//#define DEBUG_PIVOT
 
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm);
@@ -133,6 +135,7 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
     if (p == 1)
     {
         serial_sort(inp, 0, len-1);
+        //std::printf("Rank:%d, inp: %s\n", rank, arrayToString(inp, len).c_str());
         return;
     }
 
@@ -154,12 +157,12 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
         pivot = inp[pivot_index - global_index_low(global_len, p, rank)];
     MPI_Bcast(&pivot, 1, MPI_INT, pivot_rank, comm);
 
-#ifdef DEBUG
+#ifdef DEBUG_PIVOT
     if (rank == 0)
     {
-        std::cout << "Pivot_idx: " << pivot_index << std::endl;
-        std::cout << "Pivot_rank: " << pivot_rank << std::endl;
-        std::cout << "Pivot: " << pivot << std::endl;
+        std::cout << "Rank:0, Pivot_idx: " << pivot_index << std::endl;
+        std::cout << "Rank:0, Pivot_rank: " << pivot_rank << std::endl;
+        std::cout << "Rank:0, Pivot: " << pivot << std::endl;
     }
 #endif
 
@@ -215,7 +218,7 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
     }
     else {
         new_global_len = sum_high;
-        new_len = sum_high/p_high + (rank < (sum_high % p_high));
+        new_len = sum_high/p_high + ((rank-p_low) < (sum_high % p_high));
     }
 
     // Num elements
@@ -225,7 +228,7 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
             num_elements[i] = sum_low/p_low + (i < (sum_low % p_low));
         }
         else{
-            num_elements[i] = sum_high/p_high + (i < (sum_high % p_high));
+            num_elements[i] = sum_high/p_high + ((i-p_low) < (sum_high % p_high));
         }
     }
     // Prefix sum calculations required
