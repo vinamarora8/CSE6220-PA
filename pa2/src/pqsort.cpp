@@ -9,9 +9,6 @@
 #include <mpi.h>
 
 #define ROOT 0
-//#define DEBUG_BLOCK_DIST
-//#define DEBUG_ALLTOALL
-//#define DEBUG_PIVOT
 
 void serial_sort(int *inp, int low, int high);
 void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm);
@@ -135,7 +132,6 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
     if (p == 1)
     {
         serial_sort(inp, 0, len-1);
-        //std::printf("Rank:%d, inp: %s\n", rank, arrayToString(inp, len).c_str());
         return;
     }
 
@@ -156,16 +152,6 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
     if (rank == pivot_rank)
         pivot = inp[pivot_index - global_index_low(global_len, p, rank)];
     MPI_Bcast(&pivot, 1, MPI_INT, pivot_rank, comm);
-
-#ifdef DEBUG_PIVOT
-    if (rank == 0)
-    {
-        std::cout << "Rank:0, Pivot_idx: " << pivot_index << std::endl;
-        std::cout << "Rank:0, Pivot_rank: " << pivot_rank << std::endl;
-        std::cout << "Rank:0, Pivot: " << pivot << std::endl;
-    }
-#endif
-
 
     // Local partition, and count sizes
     int local_low_len = 0, local_high_len = 0;
@@ -302,27 +288,9 @@ void parallel_qsort(int *&inp, int &len, int global_len, int seed, MPI_Comm comm
         sum_displ += rcounts[i]; 
     }
 
-#ifdef DEBUG_ALLTOALL
-    std::printf("Rank is %d, pivot is %d, p_low: %d, p_high: %d\n", rank, pivot, p_low, p_high);
-    std::printf("Rank:%d, inp: %s\n", rank, arrayToString(inp, len).c_str());
-    std::printf("Rank:%d, low_len: %s\n", rank, arrayToString(low_len, p).c_str());
-    std::printf("Rank:%d, high_len: %s\n", rank, arrayToString(high_len, p).c_str());
-    std::printf("Rank:%d, prefix_sum_low: %s\n", rank, arrayToString(prefix_sum_low, len).c_str());
-    std::printf("Rank:%d, prefix_sum_high: %s\n", rank, arrayToString(prefix_sum_high, len).c_str());
-    std::printf("Rank:%d, num_elements: %s\n", rank, arrayToString(num_elements, p).c_str());
-    std::printf("Rank:%d, scounts: %s\n", rank, arrayToString(scounts, p).c_str());
-    std::printf("Rank:%d, rcounts: %s\n", rank, arrayToString(rcounts, p).c_str());
-    std::printf("Rank:%d, sdispls: %s\n", rank, arrayToString(sdispls, p).c_str());
-    std::printf("Rank:%d, rdispls: %s\n", rank, arrayToString(rdispls, p).c_str());
-#endif
-
     // All-to-all Communication to split the data into high and low
     int *new_inp = new int[new_len];
     MPI_Alltoallv(inp, scounts, sdispls, MPI_INT, new_inp, rcounts, rdispls, MPI_INT, comm);
-
-#ifdef DEBUG_ALLTOALL
-    std::printf("Rank:%d, after_inp: %s\n", rank, arrayToString(new_inp, new_len).c_str());
-#endif
 
     free(inp);
     delete[] rcounts;
@@ -364,13 +332,6 @@ int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Co
         for (int i = 0; i < len; i++)
             file >> inp[i];
         file.close();
-
-#ifdef DEBUG_INP_READ
-        std::cout << len << std::endl;
-        for (int i = 0; i < len; i++)
-            std::cout << inp[i] << " ";
-        std::cout << std::endl;
-#endif
     }
 
     // Broadcast global length
@@ -406,21 +367,6 @@ int distribute_input(const char *fname, int *&local_inp, int *global_len, MPI_Co
 
     if (rank == 0)
         free(inp);
-
-#ifdef DEBUG_BLOCK_DIST
-    for (int i = 0; i < p; i++)
-    {
-        if (i == rank)
-        {
-            std::cout << "Rank " << i << ": ";
-            for (int j = 0; j < local_len; j++)
-                std::cout << local_inp[j] << " ";
-            std::cout << std::endl;
-        }
-
-        MPI_Barrier(comm);
-    }
-#endif
     
     return local_len;
 }
@@ -461,10 +407,8 @@ void gather_output(int *local_arr, int local_len, std::ofstream &fstream, MPI_Co
     {
         for (int i = 0; i < total_len; i++)
         {
-            //std::cout << comb_array[i] << " ";
             fstream << comb_array[i] << " ";
         }
-        //std::cout << std::endl;
         fstream << std::endl;
     }
 
