@@ -19,7 +19,6 @@ def gen_input(size, op_fname, log=False):
         print(f'inp : {nums}')
     return nums
 
-
 def check_output(fname, log=False):
     with open(fname) as f:
         text = f.readlines()
@@ -45,20 +44,20 @@ def run_prog(ip_fname, op_fname, num_procs):
     os.system(cmd)
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('num_procs', type=int)
-parser.add_argument('size', type=int)
-parser.add_argument('--log', action='store_true')
-args = parser.parse_args()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('num_procs', type=int)
+    parser.add_argument('size', type=int)
+    parser.add_argument('--log', action='store_true')
+    args = parser.parse_args()
 
-size = args.size
-num_procs = args.num_procs
-log = args.log
-ip_fname = "i.txt"
-op_fname = "o.txt"
+    size = args.size
+    num_procs = args.num_procs
+    log = args.log
+    ip_fname = "i.txt"
+    op_fname = "o.txt"
 
-
-gen_input(size, ip_fname, log)
-run_prog(ip_fname, op_fname, num_procs)
-time = check_output(op_fname, log)
-print(f'time: {time}ms')
+    gen_input(size, ip_fname, log)
+    run_prog(ip_fname, op_fname, num_procs)
+    time = check_output(op_fname, log)
+    print(f'{time}')
