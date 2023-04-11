@@ -16,10 +16,10 @@ int grid_rank[2], grid_size[2];
 // Problem specific functions
 void distribute_inp(char *mat_fname, char *vec_fname);
 void gather_output(char *op_fname);
-void pjacobi_iteration(double **mat, double *vec);
+void pjacobi_iteration(double **mat, double *vec, double *res);
 double compute_error(double **mat, double *vec, double *res);
 void mat_vec_mult(double **mat, double *vec, double *res);
-void vec_sub(double *vec1, double *vec2, double *res, int n);
+void local_vec_sub(double *vec1, double *vec2, double *res, int n);
 
 
 int main(int argc, char *argv[])
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
     {
-        pjacobi_iteration(local_mat, local_vec);
+        pjacobi_iteration(local_mat, local_vec, local_res);
         error = compute_error(local_mat, local_vec, local_res);
         iter++;
     }
@@ -89,9 +89,9 @@ void gather_output(char *op_fname)
 }
 
 
-void pjacobi_iteration(double **mat, double *vec)
+void pjacobi_iteration(double **mat, double *vec, double *res)
 {
-    // TODO: Have to set local_res
+    // TODO: Have to set res
 }
 
 
@@ -110,7 +110,7 @@ void mat_vec_mult(double **mat, double *vec, double *res)
 }
 
 
-void vec_sub(double *vec1, double *vec2, double *res, int n)
+void local_vec_sub(double *vec1, double *vec2, double *res, int n)
 {
     // TODO
 }
