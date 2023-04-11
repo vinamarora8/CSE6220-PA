@@ -19,6 +19,7 @@ void gather_output(char *op_fname);
 void pjacobi_iteration(double **mat, double *vec);
 double compute_error(double **mat, double *vec, double *res);
 void mat_vec_mult(double **mat, double *vec, double *res);
+void vec_sub(double *vec1, double *vec2, double *res, int n);
 
 
 int main(int argc, char *argv[])
@@ -104,6 +105,12 @@ double compute_error(double **mat, double *vec, double *res)
 
 
 void mat_vec_mult(double **mat, double *vec, double *res)
+{
+    // TODO
+}
+
+
+void vec_sub(double *vec1, double *vec2, double *res, int n)
 {
     // TODO
 }
