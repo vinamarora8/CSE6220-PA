@@ -10,6 +10,8 @@
 double **local_mat, *local_vec, *local_res;
 int local_ni, local_nj, global_n;
 MPI_Comm grid_comm;
+int world_size, rank;
+int grid_rank[2], grid_size[2];
 
 // Problem specific functions
 void distribute_inp(char *mat_fname, char *vec_fname);
@@ -24,14 +26,13 @@ int main(int argc, char *argv[])
     char *in_vec_fname = argv[2];
     char *op_fname = argv[3];
 
-    int p, rank;
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Create grid communicator
     // TODO
-    // grid_comm is now set
+    // grid_comm, grid_size, grid_rank is now set
 
     // Read input matrix and vector
     distribute_inp(in_mat_fname, in_vec_fname);
