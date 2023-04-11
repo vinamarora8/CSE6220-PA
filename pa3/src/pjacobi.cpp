@@ -8,10 +8,10 @@
 
 // Global vars that all functions need
 double **local_mat, *local_vec, *local_res;
-int local_ni, local_nj, global_n;
+int local_n[2], global_n;
 MPI_Comm grid_comm;
 int world_size, rank;
-int grid_rank[2], grid_size[2];
+int grid_rank[2], grid_size[2]; // [0] -> rows, [1] -> cols
 
 // Problem specific functions
 void distribute_inp(char *mat_fname, char *vec_fname);
@@ -38,12 +38,12 @@ int main(int argc, char *argv[])
 
     // Read input matrix and vector
     distribute_inp(in_mat_fname, in_vec_fname);
-    // global_n, local_ni, local_nj, local_mat, local_vec are now set
+    // global_n, local_n, local_mat, local_vec are now set
 
     double starttime = MPI_Wtime();
 
     // Compute answer
-    local_res = new double[local_ni];
+    local_res = new double[local_n[0]];
     double error = 1.0;
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     // Free memory
     delete[] local_res;
     delete[] local_vec;
-    for (int i = 0; i < local_ni; i++)
+    for (int i = 0; i < local_n[0]; i++)
         delete[] local_mat[i];
 
     MPI_Finalize();
@@ -75,11 +75,11 @@ void distribute_inp(char *mat_fname, char *vec_fname)
 {
     // TODO: Have to set these global vars
     global_n = 0;
-    local_ni = 0;
-    local_nj = 0;
-    for (int i = 0; i < local_ni; i++)
-        local_mat[i] = new double[local_nj];
-    local_vec = new double[local_ni];
+    local_n[0] = 0;
+    local_n[1] = 0;
+    for (int i = 0; i < local_n[0]; i++)
+        local_mat[i] = new double[local_n[1]];
+    local_vec = new double[local_n[0]];
 }
 
 
