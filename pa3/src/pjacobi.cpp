@@ -18,7 +18,8 @@ void distribute_inp(char *mat_fname, char *vec_fname);
 void gather_output(char *op_fname);
 void pjacobi_iteration(double **mat, double *vec);
 double compute_error(double **mat, double *vec, double *res);
-void mat_vec_mult(double **mat, double *vec, double *res); // size is same as global vars
+void mat_vec_mult(double **mat, double *vec, double *res);
+
 
 int main(int argc, char *argv[])
 {
