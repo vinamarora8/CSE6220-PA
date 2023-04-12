@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <iomanip>
 #include <fstream>
 #include <mpi.h>
@@ -6,9 +7,13 @@
 #define EPS 1e-9
 #define MAX_ITER 1000000
 
+typedef std::vector<std::vector<double>> MatD;
+typedef std::vector<double> VecD;
+
 // Global vars that all functions need
-double **local_mat, *local_vec, *local_res;
-int local_n[2], global_n;
+MatD local_mat;
+VecD local_vec, local_res;
+int global_n;
 MPI_Comm grid_comm;
 int world_size, rank;
 int grid_rank[2], grid_size[2]; // [0] -> rows, [1] -> cols
@@ -16,10 +21,10 @@ int grid_rank[2], grid_size[2]; // [0] -> rows, [1] -> cols
 // Problem specific functions
 void distribute_inp(char *mat_fname, char *vec_fname);
 void gather_output(char *op_fname);
-void pjacobi_iteration(double **mat, double *vec, double *res);
-double compute_error(double **mat, double *vec, double *res);
-void mat_vec_mult(double **mat, double *vec, double *res);
-void local_vec_sub(double *vec1, double *vec2, double *res, int n);
+void pjacobi_iteration(MatD &mat, VecD &vec, VecD &res);
+double compute_error(MatD &mat, VecD &vec, VecD &res);
+void mat_vec_mult(MatD &mat, VecD &vec, VecD &res);
+void local_vec_sub(VecD &vec1, VecD &vec2, VecD &res, int n);
 
 
 int main(int argc, char *argv[])
@@ -43,7 +48,7 @@ int main(int argc, char *argv[])
     double starttime = MPI_Wtime();
 
     // Compute answer
-    local_res = new double[local_n[0]];
+    local_res.resize(local_vec.size());
     double error = 1.0;
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
@@ -61,25 +66,20 @@ int main(int argc, char *argv[])
     // Write output vector
     gather_output(op_fname);
     
-    // Free memory
-    delete[] local_res;
-    delete[] local_vec;
-    for (int i = 0; i < local_n[0]; i++)
-        delete[] local_mat[i];
-
     MPI_Finalize();
 }
 
 
 void distribute_inp(char *mat_fname, char *vec_fname)
 {
-    // TODO: Have to set these global vars
+    // TODO: Have to set these
+    int local_ni = 0;
+    int local_nj = 0;
     global_n = 0;
-    local_n[0] = 0;
-    local_n[1] = 0;
-    for (int i = 0; i < local_n[0]; i++)
-        local_mat[i] = new double[local_n[1]];
-    local_vec = new double[local_n[0]];
+    local_mat.resize(local_ni);
+    for (int i = 0; i < local_ni; i++)
+        local_mat[i].resize(local_nj);
+    local_vec.resize(local_ni);
 }
 
 
@@ -89,13 +89,13 @@ void gather_output(char *op_fname)
 }
 
 
-void pjacobi_iteration(double **mat, double *vec, double *res)
+void pjacobi_iteration(MatD &mat, VecD &vec, VecD &res)
 {
     // TODO: Have to set res
 }
 
 
-double compute_error(double **mat, double *vec, double *res)
+double compute_error(MatD &mat, VecD &vec, VecD &res)
 {
     // TODO
     double err = 0.0;
@@ -104,13 +104,13 @@ double compute_error(double **mat, double *vec, double *res)
 }
 
 
-void mat_vec_mult(double **mat, double *vec, double *res)
+void mat_vec_mult(MatD &mat, VecD &vec, VecD &res)
 {
     // TODO
 }
 
 
-void local_vec_sub(double *vec1, double *vec2, double *res, int n)
+void local_vec_sub(VecD &vec1, VecD &vec2, VecD &res, int n)
 {
     // TODO
 }
