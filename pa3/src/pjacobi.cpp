@@ -12,9 +12,15 @@
 typedef std::vector<std::vector<double>> Mat;
 typedef std::vector<double> Vec;
 typedef struct {
-    MPI_Comm comm;
-    int coords[2]; // [0] = row, [1] = col
-    int size; // Problem assumes square grid
+    // Original topology
+    int rank;
+    int world_size;
+
+    // Cartesian topology
+    MPI_Comm grid_comm;
+    int grid_coords[2]; // [0] = row, [1] = col
+    int grid_size; // Problem assumes square grid
+
     int global_n; // Global size of matrix
 } GridInfo;
 
@@ -41,8 +47,10 @@ int main(int argc, char *argv[])
     // Create grid communicator
     // TODO
     GridInfo grid_info;
-    grid_info.size = sqrt(world_size);
-    // grid_info.comm and grid_info.size are now set
+    grid_info.rank = rank;
+    grid_info.world_size = world_size;
+    grid_info.grid_size = sqrt(world_size);
+    // grid_info.grid_comm and grid_info.coords are now set
 
     // Read input matrix and vector
     Mat A;
