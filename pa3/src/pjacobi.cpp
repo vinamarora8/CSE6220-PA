@@ -3,6 +3,8 @@
 #include <cmath>
 #include <iomanip>
 #include <fstream>
+#include <string>
+#include <sstream>
 #include <mpi.h>
 
 #define EPS 1e-9
@@ -45,12 +47,17 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // Create grid communicator
-    // TODO
     GridInfo grid_info;
     grid_info.rank = rank;
     grid_info.world_size = world_size;
     grid_info.grid_size = sqrt(world_size);
-    // grid_info.grid_comm and grid_info.coords are now set
+    int periods[2] = {1, 1};
+    int dims[2] = {grid_info.grid_size, grid_info.grid_size};
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &grid_info.grid_comm);
+    MPI_Cart_coords(grid_info.grid_comm, rank, 2, grid_info.grid_coords);
+
+    std::cout << "Rank " << rank << " coords: " << grid_info.grid_coords[0] << ", " << grid_info.grid_coords[1] << std::endl;
+    MPI_Barrier(grid_info.grid_comm);
 
     // Read input matrix and vector
     Mat A;
@@ -83,16 +90,28 @@ int main(int argc, char *argv[])
 }
 
 
+/*
+ * Converts a GridInfo.grid_coords to a string
+ */
+std::string g2s(const GridInfo &g)
+{
+    std::stringstream ss;
+    ss << "(" << g.grid_coords[0] << ", " << g.grid_coords[1] << ")";
+    return ss.str();
+}
+
+
 void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname)
 {
     // TODO: Have to set these and fill the matrix
-    int local_ni = 0;
-    int local_nj = 0;
-    g.global_n = 0;
+    g.global_n = 256;
+    int local_ni = 16;
+    int local_nj = 16;
     A.resize(local_ni);
     for (int i = 0; i < local_ni; i++)
         A[i].resize(local_nj);
-    b.resize(local_ni);
+    if (g.grid_coords[1] == 0)
+        b.resize(local_ni);
 }
 
 
@@ -129,7 +148,75 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
  */
 void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag)
 {
-    // TODO
+    // Create x_t on all processes
+    Vec x_t(A.size());
+    // 1. Send x to diagonal
+    {
+        if (g.grid_coords[0] == 0 && g.grid_coords[1] == 0)
+        {
+            // Copy
+            x_t = x;
+            std::cout << g2s(g) << " copied x" << std::endl;
+        }
+        else if (g.grid_coords[1] == 0)
+        {
+            // Send
+            int recv_rank;
+            int recv_coord[2] = {g.grid_coords[0], g.grid_coords[0]};
+            MPI_Cart_rank(g.grid_comm, recv_coord, &recv_rank);
+            std::cout << g2s(g) << " send to " << recv_rank << std::endl;
+            MPI_Send(&x[0], x.size(), MPI_DOUBLE, recv_rank, 0, g.grid_comm);
+        }
+        else if (g.grid_coords[0] == g.grid_coords[1])
+        {
+            // Receive
+            int send_rank;
+            int send_coord[2] = {g.grid_coords[0], 0};
+            MPI_Cart_rank(g.grid_comm, send_coord, &send_rank);
+            std::cout << g2s(g) << " receive from " << send_rank << std::endl;
+            MPI_Recv(&x_t[0], x_t.size(), MPI_DOUBLE, send_rank, 0, g.grid_comm, MPI_STATUS_IGNORE);
+        }
+    }
+    // 2. Broadcast from diagonal
+    {
+        // Split grid communicator into column communicator
+        MPI_Comm col_comm;
+        int remain_dims[2] = {0, 1}; // keep column dimension
+        MPI_Cart_sub(g.grid_comm, remain_dims, &col_comm);
+        // Get rank of diagonal
+        // Broadcast 
+        int diag_rank;
+        int diag_coord = g.grid_coords[0];
+        MPI_Cart_rank(col_comm, &diag_coord, &diag_rank);
+        // Broadcast 
+        MPI_Bcast(&x_t[0], x_t.size(), MPI_DOUBLE, diag_rank, col_comm);
+    }
+
+    // Local dot product
+    Vec local_y(A.size());
+    for (int i = 0; i < A.size(); i++)
+    {
+        double sum = 0.0;
+        for (int j = 0; j < A[i].size(); j++)
+        {
+            if (ign_diag && i == j)
+                continue;
+            sum += A[i][j] * x_t[j];
+        }
+        local_y[i] = sum;
+    }
+
+    // Reduce local_y to y
+    // Split grid communicator into row communicator
+    MPI_Comm row_comm;
+    int remain_dims[2] = {1, 0}; // keep row dimension
+    MPI_Cart_sub(g.grid_comm, remain_dims, &row_comm);
+    // Find rank of column 0
+    int root_rank;
+    int root_coord = 0;
+    MPI_Cart_rank(row_comm, &root_coord, &root_rank);
+    // Reduce
+    MPI_Reduce(&local_y[0], &y[0], y.size(), MPI_DOUBLE, MPI_SUM, root_rank, row_comm);
 }
 
 
