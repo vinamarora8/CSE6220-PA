@@ -8,8 +8,9 @@
 #define EPS 1e-9
 #define MAX_ITER 1000000
 
-typedef std::vector<std::vector<double>> MatD;
-typedef std::vector<double> VecD;
+// Types
+typedef std::vector<std::vector<double>> Mat;
+typedef std::vector<double> Vec;
 typedef struct {
     MPI_Comm comm;
     int coords[2]; // [0] = row, [1] = col
@@ -17,13 +18,14 @@ typedef struct {
     int global_n; // Global size of matrix
 } GridInfo;
 
-// Problem specific functions
-void distribute_inp(MatD &A, VecD &b, GridInfo &g, const char *mat_fname, const char *vec_fname);
-void gather_output(char *op_fname, const VecD &x, const GridInfo &g);
-void pjacobi_iteration(VecD &x, const MatD &A, const VecD &b, const GridInfo &g);
-double compute_error(const MatD &A, const VecD &x, const VecD &b, const GridInfo &g);
-void mat_vec_mult(VecD &y, const MatD &A, const VecD &x, const GridInfo &g);
-void local_vec_sub(VecD &y, const VecD &x1, const VecD &x2);
+// Function prototypes
+void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname);
+void gather_output(char *op_fname, const Vec &x, const GridInfo &g);
+void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g);
+double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g);
+void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g);
+void local_vec_sub(Vec &y, const Vec &x1, const Vec &x2);
+
 
 int main(int argc, char *argv[])
 {
@@ -43,15 +45,15 @@ int main(int argc, char *argv[])
     // grid_info.comm and grid_info.size are now set
 
     // Read input matrix and vector
-    MatD A;
-    VecD b;
+    Mat A;
+    Vec b;
     distribute_inp(A, b, grid_info, in_mat_fname, in_vec_fname);
     // grid_info.global_n, A, b, are now set
 
     double starttime = MPI_Wtime();
 
     // Compute answer
-    VecD x(b.size());
+    Vec x(b.size());
     double error = 1.0;
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
@@ -73,7 +75,7 @@ int main(int argc, char *argv[])
 }
 
 
-void distribute_inp(MatD &A, VecD &b, GridInfo &g, const char *mat_fname, const char *vec_fname)
+void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname)
 {
     // TODO: Have to set these and fill the matrix
     int local_ni = 0;
@@ -86,7 +88,7 @@ void distribute_inp(MatD &A, VecD &b, GridInfo &g, const char *mat_fname, const 
 }
 
 
-void gather_output(char *op_fname, const VecD &x, const GridInfo &g)
+void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 {
     // TODO
 }
@@ -95,7 +97,7 @@ void gather_output(char *op_fname, const VecD &x, const GridInfo &g)
 /*
  * Computes x = D^-1 (b - Rx)
  */
-void pjacobi_iteration(VecD &x, const MatD &A, const VecD &b, const GridInfo &g)
+void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g)
 {
     // TODO
 }
@@ -104,7 +106,7 @@ void pjacobi_iteration(VecD &x, const MatD &A, const VecD &b, const GridInfo &g)
 /*
  * Computes L2 error between Ax and b
  */
-double compute_error(const MatD &A, const VecD &x, const VecD &b, const GridInfo &g)
+double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g)
 {
     // TODO
     double err = 0.0;
@@ -116,7 +118,7 @@ double compute_error(const MatD &A, const VecD &x, const VecD &b, const GridInfo
 /*
  * Computes y = Ax
  */
-void mat_vec_mult(VecD &y, const MatD &A, const VecD &x, const GridInfo &g)
+void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g)
 {
     // TODO
 }
@@ -125,7 +127,7 @@ void mat_vec_mult(VecD &y, const MatD &A, const VecD &x, const GridInfo &g)
 /*
  * Computes y = x1 - x2
  */
-void local_vec_sub(VecD &y, const VecD &x1, const VecD &x2, const GridInfo &g)
+void local_vec_sub(Vec &y, const Vec &x1, const Vec &x2, const GridInfo &g)
 {
     // TODO
 }
