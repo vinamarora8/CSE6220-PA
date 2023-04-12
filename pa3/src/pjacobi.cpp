@@ -23,8 +23,8 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g);
 void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g);
 double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g);
-void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g);
-void local_vec_sub(Vec &y, const Vec &x1, const Vec &x2);
+void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag = false);
+void inplace_vec_sub(Vec &a, const Vec &b);
 
 
 int main(int argc, char *argv[])
@@ -117,17 +117,18 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
 
 /*
  * Computes y = Ax
+ * If ign_diag is true, then the diagonal elements of A are ignored
  */
-void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g)
+void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag)
 {
     // TODO
 }
 
 
 /*
- * Computes y = x1 - x2
+ * Computes a = a - b
  */
-void local_vec_sub(Vec &y, const Vec &x1, const Vec &x2, const GridInfo &g)
+void inplace_vec_sub(Vec &a, const Vec &b)
 {
     // TODO
 }
