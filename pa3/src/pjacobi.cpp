@@ -34,6 +34,9 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
 void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag = false);
 void inplace_vec_sub(Vec &a, const Vec &b);
 
+// Debug function prototypes
+std::string g2s(const GridInfo &g); // Converts grid coords to string
+
 
 int main(int argc, char *argv[])
 {
@@ -56,7 +59,7 @@ int main(int argc, char *argv[])
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &grid_info.grid_comm);
     MPI_Cart_coords(grid_info.grid_comm, rank, 2, grid_info.grid_coords);
 
-    std::cout << "Rank " << rank << " coords: " << grid_info.grid_coords[0] << ", " << grid_info.grid_coords[1] << std::endl;
+    std::cout << "Rank " << rank << " coords: " << g2s(grid_info) << std::endl;
     MPI_Barrier(grid_info.grid_comm);
 
     // Read input matrix and vector
@@ -148,13 +151,15 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
  */
 void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag)
 {
-    // Create x_t on all processes
-    Vec x_t(A.size());
+    // Create x_t on all processes.
+    Vec x_t(A[0].size());
+    // Two steps:
     // 1. Send x to diagonal
     {
         if (g.grid_coords[0] == 0 && g.grid_coords[1] == 0)
         {
             // Copy
+            // Separate so that Send and Recv don't overlap for the same process
             x_t = x;
             std::cout << g2s(g) << " copied x" << std::endl;
         }
@@ -183,8 +188,7 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
         MPI_Comm col_comm;
         int remain_dims[2] = {0, 1}; // keep column dimension
         MPI_Cart_sub(g.grid_comm, remain_dims, &col_comm);
-        // Get rank of diagonal
-        // Broadcast 
+        // Find rank of diagonal
         int diag_rank;
         int diag_coord = g.grid_coords[0];
         MPI_Cart_rank(col_comm, &diag_coord, &diag_rank);
