@@ -19,10 +19,10 @@ typedef struct {
 
 // Problem specific functions
 void distribute_inp(MatD &A, VecD &b, GridInfo &g, const char *mat_fname, const char *vec_fname);
-void gather_output(char *op_fname, VecD &x, const GridInfo &g);
-void pjacobi_iteration(VecD &x, MatD &A, VecD &b, const GridInfo &g);
-double compute_error(MatD &A, VecD &x, VecD &b, const GridInfo &g);
-void mat_vec_mult(VecD &y, MatD &A, VecD &x, const GridInfo &g);
+void gather_output(char *op_fname, const VecD &x, const GridInfo &g);
+void pjacobi_iteration(VecD &x, const MatD &A, const VecD &b, const GridInfo &g);
+double compute_error(const MatD &A, const VecD &x, const VecD &b, const GridInfo &g);
+void mat_vec_mult(VecD &y, const MatD &A, const VecD &x, const GridInfo &g);
 void local_vec_sub(VecD &y, const VecD &x1, const VecD &x2);
 
 int main(int argc, char *argv[])
@@ -86,7 +86,7 @@ void distribute_inp(MatD &A, VecD &b, GridInfo &g, const char *mat_fname, const 
 }
 
 
-void gather_output(char *op_fname, VecD &x, const GridInfo &g)
+void gather_output(char *op_fname, const VecD &x, const GridInfo &g)
 {
     // TODO
 }
@@ -95,7 +95,7 @@ void gather_output(char *op_fname, VecD &x, const GridInfo &g)
 /*
  * Computes x = D^-1 (b - Rx)
  */
-void pjacobi_iteration(VecD &x, MatD &A, VecD &b, const GridInfo &g)
+void pjacobi_iteration(VecD &x, const MatD &A, const VecD &b, const GridInfo &g)
 {
     // TODO
 }
@@ -104,7 +104,7 @@ void pjacobi_iteration(VecD &x, MatD &A, VecD &b, const GridInfo &g)
 /*
  * Computes L2 error between Ax and b
  */
-double compute_error(MatD &A, VecD &x, VecD &b, const GridInfo &g)
+double compute_error(const MatD &A, const VecD &x, const VecD &b, const GridInfo &g)
 {
     // TODO
     double err = 0.0;
@@ -116,7 +116,7 @@ double compute_error(MatD &A, VecD &x, VecD &b, const GridInfo &g)
 /*
  * Computes y = Ax
  */
-void mat_vec_mult(VecD &y, MatD &A, VecD &x, const GridInfo &g)
+void mat_vec_mult(VecD &y, const MatD &A, const VecD &x, const GridInfo &g)
 {
     // TODO
 }
