@@ -117,7 +117,7 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
 
 /*
  * Computes y = Ax
- * If ign_diag is true, then the diagonal elements of A are ignored
+ * If ign_diag is true, then the diagonal elements of A are ignored (taken to be 0)
  */
 void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag)
 {
