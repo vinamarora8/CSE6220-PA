@@ -216,7 +216,7 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
         double sum = 0.0;
         for (int j = 0; j < A[i].size(); j++)
         {
-            if (ign_diag && i == j)
+            if (ign_diag && g.grid_coords[0] == g.grid_coords[1] && i == j)
                 continue;
             sum += A[i][j] * x_t[j];
         }
