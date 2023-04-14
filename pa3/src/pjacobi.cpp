@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 
     // Compute answer
     Vec x(b.size());
-    double error = 1.0;
+    double error = compute_error(A, x, b, grid_info);
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
     {
@@ -139,7 +139,18 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
  */
 void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g)
 {
-    // TODO
+    Vec y(A[0].size());
+    // Compute Rx
+    mat_vec_mult(y, A, x, g, true);
+    // Compute b - Rx
+    inplace_vec_sub(y, b);
+    // Compute D_inv
+    Mat D_inv(A.size(), Vec(A[0].size(), 0));
+    for(int i = 0; i < A.size(); i++){
+        D_inv[i][i] = 1 / A[i][i];
+    }
+    // Compute x = D_inv(b - Rx)
+    mat_vec_mult(x, D_inv, y, g, false);
 }
 
 
@@ -239,7 +250,7 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
 
 
 /*
- * Computes a = a - b
+ * Computes a = b - a
  */
 void inplace_vec_sub(Vec &a, const Vec &b)
 {
