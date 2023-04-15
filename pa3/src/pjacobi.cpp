@@ -10,6 +10,7 @@
 
 #define EPS 1e-9
 #define MAX_ITER 1000000
+#define ROOT 0
 
 #ifdef NDEBUG
 #   define DBGMSG(en, msg)
@@ -113,24 +114,184 @@ std::string g2s(const GridInfo &g)
     return ss.str();
 }
 
-
 void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname)
 {
     // TODO: Have to set these and fill the matrix
-    g.global_n = 256;
-    int local_ni = 16;
-    int local_nj = 16;
+    int rank, size, q, n;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    q = sqrt(size);
+    if (q * q != size)
+    {
+        if (rank == 0)
+            std::cout << "Number of processes must be a perfect square" << std::endl;
+        MPI_Finalize();
+        exit(1);
+    }
+
+    // Set values for grid info for the given rank of the processor
+    g.grid_coords[0] = rank / q;
+    g.grid_coords[1] = rank % q;
+
+    if (rank == ROOT)
+    {
+        // Read the file
+        std::ifstream mat_file(mat_fname);
+        mat_file >> n;  // Read the size of the matrix
+        g.global_n = n; // Set the global size of the matrix
+    }
+
+    MPI_Bcast(n, 1, MPI_INT, ROOT, comm);
+
+    // initialize the matrix and vector
+    std:: : vector<int> count, displs;        // counts and displs for b
+    std::vector<int> fill_count, fill_displs; // counts and displs for A
+    std::vector<double> inp;
+    std::vector<double> inp_b;
+
+    // calculate the counts and displacements for the scatterv function
+    int local_ni, local_nj;
+
+    // same count and displs can be used for row and column
+    int n_by_q = n / q; // floor(n/q)
+    int n_mod_q = n % q;
+
+    count.resize(q);
+    displs.resize(q);
+
+
+    for (int i = 0; i < q; i++)
+    {
+        count[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
+        displs[i] = (i == 0) ? 0 : displs[i - 1] + count[i - 1];
+    }
+
+    if (rank == ROOT)
+    {
+        // count the number of elements to be filled per processor
+        fill_count.resize(size);
+        fill_displs.resize(size);
+        inp.resize(size);
+
+        for (i = 0; i < size; i++)
+        {
+            local_ni = count[i / q];
+            local_nj = count[i % q];
+            fill_count[i] = local_ni * local_nj;
+            fill_displs[i] = (i == 0) ? 0 : fill_displs[i - 1] + fill_count[i - 1];
+            inp[i].resize(fill_count[i]);
+        }
+
+        // Load the inp file into matrix inp in a way its continous in memory for a given processor
+        double val;
+        for (int i = 0; i < q; i++)
+        {
+            count_i = count[i];
+            for (int k = 0; k < count_i; k++)
+            {
+                for (int j = 0; j < q; j++)
+                {
+                    count_j = count[j];
+                    for (int l = 0; l < count_j; l++)
+                    {
+                        mat_file >> val;
+                        int p = i * q + j;
+                        int index = k * count_j + l;
+                        inp[p][index] = val;
+                    }
+                }
+            }
+        }
+
+        // Load the vector file into vector b
+        std::ifstream vec_file(vec_fname);
+        inp_b.resize(n);
+
+        for (int i = 0; i < n; i++)
+        {
+            double val;
+            vec_file >> val;
+            inp_b[i].push_back(val);
+        }
+    }
+
+    // set the local_ni and local_nj for the processor
+    MPI_Scatter(
+        (int *)counts, 1, MPI_INT,
+        &local_count, 1, MPI_INT,
+        ROOT, comm);
+
+    local_ni = count[rank / q];
+    local_ni = count[rank % q];
     A.resize(local_ni);
     for (int i = 0; i < local_ni; i++)
+    {
         A[i].resize(local_nj);
-    if (g.grid_coords[1] == 0)
-        b.resize(local_ni);
-}
+    }
 
+    if (g.grid_coords[1] == 0)
+    {
+        b.resize(local_ni);
+    }
+
+    // for p processors, scatter the matrix and vector to the processors
+    MPI_Scatterv(
+        inp, fill_count, fill_displs, MPI_DOUBLE,
+        A, fill_count[rank], MPI_DOUBLE, ROOT, 
+        MPI_COMM_WORLD
+    );
+
+    MPI_Scatterv(
+        inp_b, count, displs, MPI_DOUBLE, 
+        b, count[rank], MPI_DOUBLE, ROOT, 
+        MPI_COMM_WORLD
+    );
+}
 
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 {
     // TODO
+    
+    int rank, size, q, n;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    n = g.global_n;
+
+    // same count and displs can be used for row and column
+    int n_by_q = n / q; // floor(n/q)
+    int n_mod_q = n % q;
+
+    count.resize(q);
+    displs.resize(q);
+
+    for (int i = 0; i < q; i++)
+    {
+        count[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
+        displs[i] = (i == 0) ? 0 : displs[i - 1] + count[i - 1];
+    }
+
+    // Gather outputs
+    std::vector<double> *comb_array;
+    MPI_Gather(
+        x, count[rank], MPI_DOUBLE,
+        comb_array, counts, displs, MPI_DOUBLE,
+        ROOT, MPI_COMM_WORLD
+    );
+
+    if (rank == ROOT)
+    {
+        for (int i = 0; i < total_len; i++)
+        {
+            op_fname << comb_array[i] << " ";
+        }
+        op_fname << std::endl;
+    }
+
+    free(comb_array);
+
+
 }
 
 
@@ -244,4 +405,5 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
 void inplace_vec_sub(Vec &a, const Vec &b)
 {
     // TODO
+
 }
