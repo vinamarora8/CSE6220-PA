@@ -349,8 +349,22 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
 {
     // TODO
     double err = 0.0;
+    double total_err = 0.0;
+    Vec y;
+    
+    mat_vec_mult(y, A, x, g, false); // need to consider diagonal elements
+    
+    // TODO changes pertaining to b being a column vector
+    for(int i = 0; i < y.size(); i++){
+        err += ((y[i] - b[i]) * (y[i] - b[i]));
+    }
+    err = sqrt(err);
+    
+    // MPI_Reduce(&err, &total_err, 1, MPI_DOUBLE, MPI_SUM, ROOT, MPI_COMM_WORLD);
+    // all reduce
+    MPI_Allreduce(&err, &total_err, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-    return err;
+    return total_err;
 }
 
 
@@ -438,10 +452,13 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
 
 
 /*
- * Computes a = a - b
+ * Computes a = b - a
  */
 void inplace_vec_sub(Vec &a, const Vec &b)
 {
     // TODO
-
+    for (int i = 0; i < a.size(); i++)
+    {
+        a[i] = b[i] - a[i];
+    }
 }
