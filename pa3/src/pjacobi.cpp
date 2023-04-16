@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     Mat A;
     Vec b;
     distribute_inp(A, b, grid_info, in_mat_fname, in_vec_fname);
-    // grid_info.global_n, A, b, are now set
+    // // grid_info.global_n, A, b, are now set
 
     double starttime = MPI_Wtime();
 
@@ -142,64 +142,66 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
         mat_file >> n;  // Read the size of the matrix
         g.global_n = n; // Set the global size of the matrix
     }
-
-    MPI_Bcast(n, 1, MPI_INT, ROOT, comm);
+    
+    // Broadcast the size of the matrix
+    MPI_Bcast(&n, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
 
     // initialize the matrix and vector
-    std:: : vector<int> count, displs;        // counts and displs for b
-    std::vector<int> fill_count, fill_displs; // counts and displs for A
-    std::vector<double> inp;
-    std::vector<double> inp_b;
-
-    // calculate the counts and displacements for the scatterv function
+    std::vector<int> counts, displs;        // counts and displs for b
+    std::vector<int> fill_counts, fill_displs; // counts and displs for A
+    std::vector<double> inp, inp_b;         // input buffer for A and b
     int local_ni, local_nj;
 
-    // same count and displs can be used for row and column
+
     int n_by_q = n / q; // floor(n/q)
     int n_mod_q = n % q;
 
-    count.resize(q);
+    // counts, displs, fill_counts, fill_displs are calculated on all the processors since communicating them would be expensive
+    counts.resize(q);
     displs.resize(q);
-
 
     for (int i = 0; i < q; i++)
     {
-        count[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
-        displs[i] = (i == 0) ? 0 : displs[i - 1] + count[i - 1];
+        counts[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
+        displs[i] = (i == 0) ? 0 : displs[i - 1] + counts[i - 1];
+    }
+
+    // count the number of elements to be filled per processor
+    fill_counts.resize(size);
+    fill_displs.resize(size);
+    
+    for (int i = 0; i < size; i++)
+    {
+        local_ni = counts[i / q];
+        local_nj = counts[i % q];
+        fill_counts[i] = local_ni * local_nj;
+        fill_displs[i] = (i == 0) ? 0 : fill_displs[i - 1] + fill_counts[i - 1];
     }
 
     if (rank == ROOT)
-    {
-        // count the number of elements to be filled per processor
-        fill_count.resize(size);
-        fill_displs.resize(size);
-        inp.resize(size);
-
-        for (i = 0; i < size; i++)
-        {
-            local_ni = count[i / q];
-            local_nj = count[i % q];
-            fill_count[i] = local_ni * local_nj;
-            fill_displs[i] = (i == 0) ? 0 : fill_displs[i - 1] + fill_count[i - 1];
-            inp[i].resize(fill_count[i]);
-        }
-
+    {        
+        inp.resize(n*n);
         // Load the inp file into matrix inp in a way its continous in memory for a given processor
         double val;
+        int count_i, count_j;
+        std::ifstream mat_file(mat_fname);
+        double tmp;
+        mat_file >> tmp; // Need to read again
+
         for (int i = 0; i < q; i++)
         {
-            count_i = count[i];
+            count_i = counts[i];
             for (int k = 0; k < count_i; k++)
             {
                 for (int j = 0; j < q; j++)
                 {
-                    count_j = count[j];
+                    count_j = counts[j];
                     for (int l = 0; l < count_j; l++)
                     {
                         mat_file >> val;
                         int p = i * q + j;
                         int index = k * count_j + l;
-                        inp[p][index] = val;
+                        inp[fill_displs[p] + index] = val;
                     }
                 }
             }
@@ -213,41 +215,62 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
         {
             double val;
             vec_file >> val;
-            inp_b[i].push_back(val);
+            inp_b[i] = val;
         }
     }
 
-    // set the local_ni and local_nj for the processor
-    MPI_Scatter(
-        (int *)counts, 1, MPI_INT,
-        &local_count, 1, MPI_INT,
-        ROOT, comm);
+    local_ni = counts[int(rank / q)];
+    local_nj = counts[int(rank % q)];
 
-    local_ni = count[rank / q];
-    local_ni = count[rank % q];
     A.resize(local_ni);
     for (int i = 0; i < local_ni; i++)
     {
         A[i].resize(local_nj);
     }
-
+    
     if (g.grid_coords[1] == 0)
     {
         b.resize(local_ni);
     }
 
     // for p processors, scatter the matrix and vector to the processors
+    std::vector<double> recvbuff(fill_counts[rank]);
     MPI_Scatterv(
-        inp, fill_count, fill_displs, MPI_DOUBLE,
-        A, fill_count[rank], MPI_DOUBLE, ROOT, 
+        (void *) &inp[0], (int *) &fill_counts[0], (int *) &fill_displs[0], MPI_DOUBLE,
+        (void *) &recvbuff[0], fill_counts[rank], MPI_DOUBLE, ROOT, 
         MPI_COMM_WORLD
     );
 
-    MPI_Scatterv(
-        inp_b, count, displs, MPI_DOUBLE, 
-        b, count[rank], MPI_DOUBLE, ROOT, 
-        MPI_COMM_WORLD
-    );
+    std::cout << "Rank " << rank << " local_ni local_nj " << local_ni << " " <<  local_nj << std::endl;
+
+    for ( int i = 0; i < local_ni; i++ )
+    {
+        for ( int j = 0; j < local_nj; j++ )
+        {
+            A[i][j] = recvbuff[i * local_nj + j];
+        }
+    }
+    // A is set
+
+    // Split communicator for b
+    MPI_Comm my_comm;
+    MPI_Comm_split(MPI_COMM_WORLD, (rank % q == 0) , rank, &my_comm);
+
+    if (g.grid_coords[1] == 0)
+    {
+        MPI_Scatterv(
+            (void *) &inp_b[0], (int *) &counts[0], (int *) &displs[0], MPI_DOUBLE, 
+            (void *) &b[0], counts[int(rank/q)], MPI_DOUBLE, ROOT, 
+            my_comm
+        );
+    }
+    // b is set
+    
+    if (rank == ROOT){
+        // free the memory
+        inp.clear();
+        inp_b.clear();
+    }
 }
 
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
@@ -262,34 +285,37 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
     // same count and displs can be used for row and column
     int n_by_q = n / q; // floor(n/q)
     int n_mod_q = n % q;
-
-    count.resize(q);
+    std::vector<int> counts, displs;
+    counts.resize(q);
     displs.resize(q);
 
     for (int i = 0; i < q; i++)
     {
-        count[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
-        displs[i] = (i == 0) ? 0 : displs[i - 1] + count[i - 1];
+        counts[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
+        displs[i] = (i == 0) ? 0 : displs[i - 1] + counts[i - 1];
     }
 
     // Gather outputs
-    std::vector<double> *comb_array;
-    MPI_Gather(
-        x, count[rank], MPI_DOUBLE,
-        comb_array, counts, displs, MPI_DOUBLE,
-        ROOT, MPI_COMM_WORLD
-    );
+    std::vector<double> comb_array;
+    // MPI_Gather(
+    //     x, counts[rank], MPI_DOUBLE,
+    //     comb_array, counts, displs, MPI_DOUBLE,
+    //     ROOT, MPI_COMM_WORLD
+    // );
 
     if (rank == ROOT)
     {
-        for (int i = 0; i < total_len; i++)
+        std::ofstream opfile;
+        opfile.open(op_fname);
+        for (int i = 0; i < comb_array.size(); i++)
         {
-            op_fname << comb_array[i] << " ";
+            opfile << comb_array[i] << " ";
         }
-        op_fname << std::endl;
+        opfile << std::endl;
+        opfile.close();
+
     }
 
-    free(comb_array);
 
 
 }
