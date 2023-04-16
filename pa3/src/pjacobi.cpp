@@ -241,8 +241,6 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
         MPI_COMM_WORLD
     );
 
-    std::cout << "Rank " << rank << " local_ni local_nj " << local_ni << " " <<  local_nj << std::endl;
-
     for ( int i = 0; i < local_ni; i++ )
     {
         for ( int j = 0; j < local_nj; j++ )
@@ -265,7 +263,7 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
         );
     }
     // b is set
-    
+
     if (rank == ROOT){
         // free the memory
         inp.clear();
@@ -280,7 +278,12 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
     int rank, size, q, n;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    n = g.global_n;
+    
+    if (rank == ROOT){
+        n = g.global_n;
+    }
+    MPI_Bcast(&n, 1, MPI_INT, ROOT, MPI_COMM_WORLD);
+    q = int(sqrt(size));
 
     // same count and displs can be used for row and column
     int n_by_q = n / q; // floor(n/q)
@@ -289,35 +292,44 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
     counts.resize(q);
     displs.resize(q);
 
+
     for (int i = 0; i < q; i++)
     {
         counts[i] = (n_by_q + (i < n_mod_q)); // ceil(n/q) or floor(n/q)
         displs[i] = (i == 0) ? 0 : displs[i - 1] + counts[i - 1];
     }
-
+    
     // Gather outputs
+    int local_index = int(rank / q);
     std::vector<double> comb_array;
-    // MPI_Gather(
-    //     x, counts[rank], MPI_DOUBLE,
-    //     comb_array, counts, displs, MPI_DOUBLE,
-    //     ROOT, MPI_COMM_WORLD
-    // );
+    comb_array.resize(n);
+    MPI_Comm my_comm;
+    MPI_Comm_split(MPI_COMM_WORLD, (rank % q == 0) , rank, &my_comm);
+
+    if (g.grid_coords[1] == 0)
+    {
+
+        MPI_Gatherv(
+            (void *) &x[0], counts[local_index], MPI_DOUBLE,
+            (void *) &comb_array[0], (int *) &counts[0], (int *) &displs[0], 
+            MPI_DOUBLE, ROOT, my_comm
+        );
+    }
 
     if (rank == ROOT)
     {
         std::ofstream opfile;
         opfile.open(op_fname);
-        for (int i = 0; i < comb_array.size(); i++)
+        for (int i = 0; i < n; i++)
         {
             opfile << comb_array[i] << " ";
         }
         opfile << std::endl;
         opfile.close();
-
     }
 
-
-
+    // free the memory
+    comb_array.clear();
 }
 
 
