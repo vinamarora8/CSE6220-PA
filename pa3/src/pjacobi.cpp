@@ -132,8 +132,6 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
     }
 
     // Set values for grid info for the given rank of the processor
-    g.grid_coords[0] = rank / q;
-    g.grid_coords[1] = rank % q;
 
     if (rank == ROOT)
     {
@@ -264,11 +262,6 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
     }
     // b is set
 
-    if (rank == ROOT){
-        // free the memory
-        inp.clear();
-        inp_b.clear();
-    }
 }
 
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
@@ -328,8 +321,6 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
         opfile.close();
     }
 
-    // free the memory
-    comb_array.clear();
 }
 
 
