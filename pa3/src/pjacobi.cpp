@@ -147,16 +147,20 @@ void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g)
     {
         local_d[i] = A[i][i];
     }
-    // Split grid communicator into row communicator
-    MPI_Comm row_comm;
-    int remain_dims[2] = {0, 1}; // drop row dimension 
-    MPI_Cart_sub(g.grid_comm, remain_dims, &row_comm);
-    // Find rank of column 0
-    int root_rank;
-    int root_coord[1] = {0};
-    MPI_Cart_rank(row_comm, root_coord, &root_rank);
-    // Reduce
-    MPI_Gather(&local_d[0], local_d.size(), MPI_DOUBLE, &d[0], local_d.size(), MPI_DOUBLE, root_rank, row_comm);
+    // Send
+    if(g.grid_coords[0] == g.grid_coords[1]){
+        int recv_rank;
+        int recv_coord[2] = {g.grid_coords[0], 0};
+        MPI_Cart_rank(g.grid_comm, recv_coord, &recv_rank);
+        MPI_Send(&local_d[0], local_d.size(), MPI_DOUBLE, recv_rank, 0, g.grid_comm);
+    }
+    // Receive
+    if(g.grid_coords[1] == 0){
+        int send_rank;
+        int send_coord[2] = {g.grid_coords[0], g.grid_coords[0]};
+        MPI_Cart_rank(g.grid_comm, send_coord, &send_rank);
+        MPI_Recv(&d[0], local_d.size(), MPI_DOUBLE, send_rank, 0, g.grid_comm, MPI_STATUS_IGNORE);
+    }
 }
 
 /*
