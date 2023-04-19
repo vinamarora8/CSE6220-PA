@@ -6,6 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('nprocs', type=int, help="Number of CPUs")
 parser.add_argument('--n', type=int, default=None, help="Problem size (n)")
 parser.add_argument('--debug', type=bool, default=False, help="Debug output")
+parser.add_argument('--mul', type=bool, default=False, help="Will test mat-vec-mul if true")
 args = parser.parse_args()
 
 nprocs = args.nprocs
@@ -17,7 +18,10 @@ if n is None:
 A = np.random.random((n, n)) * 10
 x = np.random.random(n) * 100
 
-y = np.dot(A, x)
+if args.mul:
+    y = np.dot(A, x)
+else:
+    y = np.linalg.solve(A, x)
 
 def write_matrix(A, fname):
     n = A.shape[0]
