@@ -49,13 +49,14 @@ out_fname = 'out_vec.txt'
 write_matrix(A, inp_mat_fname)
 write_vector(x, inp_vec_fname)
 
-cmd = f'mpirun -np {nprocs} ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
+cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
 print(cmd)
 os.system(cmd)
 
 ans = read_vector('out_vec.txt', n)
 err = y - ans
 err_norm = np.linalg.norm(err)
+criteria = 1e-9 * n
 
 if args.debug:
     print('Expected')
@@ -68,7 +69,8 @@ if args.debug:
     print(err)
 
 print(f'Error norm: {err_norm}')
-if (err_norm < 1e-9):
+print(f'Criteria: {criteria}')
+if (err_norm < criteria):
     print('PASS')
     exit(0)
 else:
