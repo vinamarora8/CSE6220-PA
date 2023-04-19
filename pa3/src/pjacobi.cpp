@@ -382,7 +382,7 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
 {
     double err = 0.0;
     double total_err = 0.0;
-    Vec y;
+    Vec y(x.size());
     
     mat_vec_mult(y, A, x, g, false); // need to consider diagonal elements
     
