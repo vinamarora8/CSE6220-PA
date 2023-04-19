@@ -116,7 +116,6 @@ std::string g2s(const GridInfo &g)
 
 void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname)
 {
-    // TODO: Have to set these and fill the matrix
     bool debug = false;
     int rank, size, q, n;
 
@@ -267,7 +266,6 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
 
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 {
-    // TODO
     bool debug = false;
     int rank, size, q, n;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -295,7 +293,7 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
     
     // Gather outputs
     int local_index = int(rank / q);
-    std::vector<double> comb_array;
+    Vec comb_array;
     comb_array.resize(n);
     MPI_Comm my_comm;
     MPI_Comm_split(MPI_COMM_WORLD, (rank % q == 0) , rank, &my_comm);
@@ -314,6 +312,7 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
     {
         std::ofstream opfile;
         opfile.open(op_fname);
+        opfile << std::fixed << std::setprecision(16);
         for (int i = 0; i < n; i++)
         {
             opfile << comb_array[i] << " ";
@@ -339,7 +338,6 @@ void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g)
  */
 double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g)
 {
-    // TODO
     double err = 0.0;
     double total_err = 0.0;
     Vec y;
@@ -350,11 +348,11 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
     for(int i = 0; i < y.size(); i++){
         err += ((y[i] - b[i]) * (y[i] - b[i]));
     }
-    err = sqrt(err);
     
     // MPI_Reduce(&err, &total_err, 1, MPI_DOUBLE, MPI_SUM, ROOT, MPI_COMM_WORLD);
     // all reduce
     MPI_Allreduce(&err, &total_err, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    total_err = sqrt(total_err);
 
     return total_err;
 }
@@ -407,7 +405,7 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
         MPI_Cart_sub(g.grid_comm, remain_dims, &col_comm);
         // Find rank of diagonal
         int diag_rank;
-        int diag_coord[1] = {g.grid_coords[0]};
+        int diag_coord[1] = {g.grid_coords[1]};
         MPI_Cart_rank(col_comm, diag_coord, &diag_rank);
         // Broadcast 
         MPI_Bcast(&x_t[0], x_t.size(), MPI_DOUBLE, diag_rank, col_comm);
