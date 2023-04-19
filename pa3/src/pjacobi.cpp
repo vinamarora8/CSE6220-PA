@@ -117,6 +117,7 @@ std::string g2s(const GridInfo &g)
 void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname)
 {
     // TODO: Have to set these and fill the matrix
+    bool debug = false;
     int rank, size, q, n;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -132,8 +133,6 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
     }
 
     // Set values for grid info for the given rank of the processor
-    g.grid_coords[0] = rank / q;
-    g.grid_coords[1] = rank % q;
 
     if (rank == ROOT)
     {
@@ -264,17 +263,12 @@ void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const ch
     }
     // b is set
 
-    if (rank == ROOT){
-        // free the memory
-        inp.clear();
-        inp_b.clear();
-    }
 }
 
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 {
     // TODO
-    
+    bool debug = false;
     int rank, size, q, n;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -328,8 +322,6 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
         opfile.close();
     }
 
-    // free the memory
-    comb_array.clear();
 }
 
 
