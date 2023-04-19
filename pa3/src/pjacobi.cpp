@@ -37,10 +37,11 @@ typedef struct {
 // Function prototypes
 void distribute_inp(Mat &A, Vec &b, GridInfo &g, const char *mat_fname, const char *vec_fname);
 void gather_output(char *op_fname, const Vec &x, const GridInfo &g);
-void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g);
+void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const Vec &d, const GridInfo &g);
 double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g);
 void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag = false);
 void inplace_vec_sub(Vec &a, const Vec &b);
+void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g);
 
 // Debug function prototypes
 std::string g2s(const GridInfo &g); // Converts grid coords to string
@@ -83,11 +84,13 @@ int main(int argc, char *argv[])
 
     // Compute answer
     Vec x(b.size());
-    double error = 1.0;
+    Vec d(b.size());
+    compute_diagonal(d, A, grid_info);
+    double error = compute_error(A, x, b, grid_info);
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
     {
-        pjacobi_iteration(x, A, b, grid_info);
+        pjacobi_iteration(x, A, b, d, grid_info);
         error = compute_error(A, x, b, grid_info);
         iter++;
     }
@@ -323,13 +326,52 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 
 }
 
+/*
+ * Computes d = Diagonal vec of A
+ */
+void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g)
+{
+    // compute local_d
+    Vec local_d(A.size());
+    for(int i = 0; i < local_d.size(); i++)
+    {
+        local_d[i] = A[i][i];
+    }
+    // Send
+    if(g.grid_coords[0] == g.grid_coords[1]){
+        int recv_rank;
+        int recv_coord[2] = {g.grid_coords[0], 0};
+        MPI_Cart_rank(g.grid_comm, recv_coord, &recv_rank);
+        MPI_Send(&local_d[0], local_d.size(), MPI_DOUBLE, recv_rank, 0, g.grid_comm);
+    }
+    // Receive
+    if(g.grid_coords[1] == 0){
+        int send_rank;
+        int send_coord[2] = {g.grid_coords[0], g.grid_coords[0]};
+        MPI_Cart_rank(g.grid_comm, send_coord, &send_rank);
+        MPI_Recv(&d[0], local_d.size(), MPI_DOUBLE, send_rank, 0, g.grid_comm, MPI_STATUS_IGNORE);
+    }
+}
 
 /*
  * Computes x = D^-1 (b - Rx)
  */
-void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const GridInfo &g)
+void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const Vec &d, const GridInfo &g)
 {
-    // TODO
+    Vec y(A[0].size());
+    // Compute Rx
+    mat_vec_mult(y, A, x, g, true);
+    // Compute b - Rx
+    inplace_vec_sub(y, b);
+    // Compute x = D_inv(b - Rx) for column 0
+    if(g.grid_coords[1] == 0)
+    {
+        for(int i = 0; i < A.size(); i++)
+        {
+            y[i] = y[i] / d[i];
+        }
+    }
+    x = y;
 }
 
 
