@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
     Vec x(b.size());
     Vec d(b.size());
     compute_diagonal(d, A, grid_info);
-    double error = compute_error(A, x, b, grid_info);
+    double error = 1.0;
     int iter = 0;
     while (error > EPS && iter < MAX_ITER)
     {

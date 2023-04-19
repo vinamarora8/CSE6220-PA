@@ -18,6 +18,10 @@ if n is None:
 A = np.random.random((n, n)) * 10
 x = np.random.random(n) * 100
 
+inp_mat_fname = 'inp_mat.txt'
+inp_vec_fname = 'inp_vec.txt'
+out_fname = 'out_vec.txt'
+
 if args.mul:
     y = np.dot(A, x)
 else:
@@ -45,17 +49,15 @@ def read_vector(fname, n):
     ans = np.array(text_double)
     return ans
 
-
-inp_mat_fname = 'inp_mat.txt'
-inp_vec_fname = 'inp_vec.txt'
-out_fname = 'out_vec.txt'
+def run_program():
+    cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
+    print(cmd)
+    os.system(cmd)
 
 write_matrix(A, inp_mat_fname)
 write_vector(x, inp_vec_fname)
+run_program()
 
-cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
-print(cmd)
-os.system(cmd)
 
 ans = read_vector('out_vec.txt', n)
 err = y - ans
