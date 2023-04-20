@@ -361,17 +361,18 @@ void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const Vec &d, const G
     Vec y(A[0].size());
     // Compute Rx
     mat_vec_mult(y, A, x, g, true);
-    // Compute b - Rx
-    inplace_vec_sub(y, b);
+
     // Compute x = D_inv(b - Rx) for column 0
     if(g.grid_coords[1] == 0)
     {
+        // Compute b - Rx
+        inplace_vec_sub(y, b);
         for(int i = 0; i < A.size(); i++)
         {
             y[i] = y[i] / d[i];
         }
+        x = y;
     }
-    x = y;
 }
 
 
