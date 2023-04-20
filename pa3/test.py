@@ -16,6 +16,13 @@ assert(int(np.sqrt(nprocs))**2 == nprocs)
 if n is None:
     n = np.random.randint(4, 100)
 A = np.random.random((n, n)) * 10
+# Make the matrix diagonally dominant
+for i in range(n):
+    diagonal_element = A[i, i]
+    row_sum = np.sum(np.abs(A[i, :])) - np.abs(diagonal_element)
+    if diagonal_element <= row_sum:
+        A[i, i] += row_sum - diagonal_element + 1
+
 x = np.random.random(n) * 100
 
 inp_mat_fname = 'inp_mat.txt'
@@ -50,7 +57,7 @@ def read_vector(fname, n):
     return ans
 
 def run_program():
-    cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
+    cmd = f'mpirun -np {nprocs} --oversubscribe src/pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
     print(cmd)
     os.system(cmd)
 
