@@ -40,7 +40,6 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g);
 void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const Vec &d, const GridInfo &g);
 double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g);
 void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ign_diag = false);
-void inplace_vec_sub(Vec &a, const Vec &b);
 void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g);
 
 // Debug function prototypes
@@ -366,9 +365,9 @@ void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const Vec &d, const G
     if(g.grid_coords[1] == 0)
     {
         // Compute b - Rx
-        inplace_vec_sub(y, b);
         for(int i = 0; i < A.size(); i++)
         {
+            y[i] = b[i] - y[i];
             y[i] = y[i] / d[i];
         }
         x = y;
@@ -485,17 +484,4 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
     DBGMSG(debug, g2s(g) << " reduced to " << root_rank);
 
     MPI_Comm_free(&row_comm);
-}
-
-
-/*
- * Computes a = b - a
- */
-void inplace_vec_sub(Vec &a, const Vec &b)
-{
-    // TODO
-    for (int i = 0; i < a.size(); i++)
-    {
-        a[i] = b[i] - a[i];
-    }
 }
