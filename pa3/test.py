@@ -2,7 +2,6 @@ import numpy as np
 import os
 
 
-nprocs = 4 # number of processes
 def write_matrix(A, fname):
     n = A.shape[0]
     with open(fname, 'w') as f:
@@ -33,7 +32,7 @@ def run_program(inp_mat_fname, inp_vec_fname, out_fname):
 
 
 def one(n, p, debug=False, mul=False, passfail=False):
-    nprocs = p
+
     assert(int(np.sqrt(nprocs))**2 == nprocs)
 
     if n is None:
