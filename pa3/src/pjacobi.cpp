@@ -50,7 +50,7 @@ std::string g2s(const GridInfo &g); // Converts grid coords to string
 
 int main(int argc, char *argv[])
 {
-    bool debug = true;
+    bool debug = false;
 
     char *in_mat_fname = argv[1];
     char *in_vec_fname = argv[2];
