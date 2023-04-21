@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
     Mat A;
     Vec b;
     distribute_inp(A, b, grid_info, in_mat_fname, in_vec_fname);
-    // // grid_info.global_n, A, b, are now set
 
     double starttime = MPI_Wtime();
 
@@ -95,7 +94,6 @@ int main(int argc, char *argv[])
         error = compute_error(A, x, b, grid_info);
         iter++;
     }
-    // x is now set
 
     double runtime = (MPI_Wtime() - starttime) * 1000.0;
     if (rank == 0)
@@ -388,7 +386,6 @@ double compute_error(const Mat &A, const Vec &x, const Vec &b, const GridInfo &g
     
     mat_vec_mult(y, A, x, g, false); // need to consider diagonal elements
     
-    // TODO changes pertaining to b being a column vector
     for(int i = 0; i < y.size(); i++){
         err += ((y[i] - b[i]) * (y[i] - b[i]));
     }
