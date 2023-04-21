@@ -358,7 +358,7 @@ void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g)
  */
 void pjacobi_iteration(Vec &x, const Mat &A, const Vec &b, const Vec &d, const GridInfo &g)
 {
-    Vec y(A[0].size());
+    Vec y(b.size());
     // Compute Rx
     mat_vec_mult(y, A, x, g, true);
 
