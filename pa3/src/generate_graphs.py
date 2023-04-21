@@ -18,13 +18,16 @@ for p = 1, 4, 9, 16, 25, 36, 49, 64
 plot runtime vs p for each n
 '''
 def runtime_vs_p():
-    procs = [1, 4, 9, 16, 25, 36, 49, 64]
-    nums = [10, 100, 1000, 10000, 100000, 1000000]
+    procs = [1, 4, 9, 16]#25, 36, 49, 64]
+    # procs = [1, 4, 9, 16, 25, 36, 49, 64]
+    nums = [1, 10, 100, 1000, 10000]# 100000, 1000000]
+    # nums = [10, 100, 1000, 10000, 100000, 1000000]
     avg_runtimes = []
     for n in nums:
         temp_runtimes = []
         print('Starting for n = ', n)
         for p in procs:
+            print('Starting for p = ', p)
             sum = 0
             # find the mean of 5 runs
             for i in range(5):
@@ -35,6 +38,7 @@ def runtime_vs_p():
                 pattern = r"Runtime: (\d+\.\d+)"
                 match = re.search(pattern, output_lines[0])
                 sum += float(match.group(1))
+            print('Done for p = ', p)
             temp_runtimes.append(sum/5)
         print('Done for n = ', n)
         avg_runtimes.append(temp_runtimes)
@@ -62,13 +66,16 @@ plot runtime vs n for each p
 '''
 def runtime_vs_n():
 
-    procs = [1, 4, 9, 16, 25, 36, 49, 64]
-    nums = [10 , 100, 1000, 10000, 100000, 1000000]
+    procs = [1, 4, 9, 16]#25, 36, 49, 64]
+    # procs = [1, 4, 9, 16, 25, 36, 49, 64]
+    nums = [1, 10, 100, 1000, 10000]# 100000, 1000000]
+    # nums = [10, 100, 1000, 10000, 100000, 1000000]
     avg_runtimes = []
     for p in procs:
         temp_runtimes = []
         print('Starting for p = ', p)
         for n in nums:
+            print('Starting for n = ', n)
             sum = 0
             # find the mean of 5 runs
             for i in range(5):
@@ -79,6 +86,7 @@ def runtime_vs_n():
                 pattern = r"Runtime: (\d+\.\d+)"
                 match = re.search(pattern, output_lines[0])
                 sum += float(match.group(1))
+            print('Done for n = ', n)
             temp_runtimes.append(sum/5)
         print('Done for p = ', p)
         avg_runtimes.append(temp_runtimes)
