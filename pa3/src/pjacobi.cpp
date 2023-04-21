@@ -12,6 +12,8 @@
 #define MAX_ITER 1000000
 #define ROOT 0
 
+#define NDEBUG
+
 #ifdef NDEBUG
 #   define DBGMSG(en, msg)
 #else
