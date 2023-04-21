@@ -331,6 +331,7 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g)
 {
     // compute local_d
+    bool debug = true;
     Vec local_d(A.size());
     for(int i = 0; i < local_d.size(); i++)
     {
