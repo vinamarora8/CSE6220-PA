@@ -337,15 +337,23 @@ void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g)
     {
         local_d[i] = A[i][i];
     }
+    // for coord (0, 0) copy local_d to d
+    if (g.grid_coords[0] == 0 && g.grid_coords[1] == 0)
+    {
+        // Copy
+        // Separate so that Send and Recv don't overlap for the same process
+        d = local_d;
+        DBGMSG(debug, g2s(g) << " copied d");
+    }
     // Send
-    if(g.grid_coords[0] == g.grid_coords[1]){
+    else if(g.grid_coords[0] == g.grid_coords[1]){
         int recv_rank;
         int recv_coord[2] = {g.grid_coords[0], 0};
         MPI_Cart_rank(g.grid_comm, recv_coord, &recv_rank);
         MPI_Send(&local_d[0], local_d.size(), MPI_DOUBLE, recv_rank, 0, g.grid_comm);
     }
     // Receive
-    if(g.grid_coords[1] == 0){
+    else if(g.grid_coords[1] == 0){
         int send_rank;
         int send_coord[2] = {g.grid_coords[0], g.grid_coords[0]};
         MPI_Cart_rank(g.grid_comm, send_coord, &send_rank);
