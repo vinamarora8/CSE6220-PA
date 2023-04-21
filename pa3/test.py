@@ -1,47 +1,5 @@
 import numpy as np
 import os
-import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument('nprocs', type=int, help="Number of CPUs")
-parser.add_argument('--n', type=int, default=None, help="Problem size (n)")
-parser.add_argument('--debug', type=bool, default=False, help="Debug output")
-parser.add_argument('--mul', type=bool, default=False, help="Will test mat-vec-mul if true")
-parser.add_argument('--ign_diag', type=bool, default=False, help="Ignore diagonal if mat-vec-mul")
-args = parser.parse_args()
-
-nprocs = args.nprocs
-n = args.n
-assert(int(np.sqrt(nprocs))**2 == nprocs)
-
-if n is None:
-    n = np.random.randint(4, 100)
-A = np.random.random((n, n)) * 10
-
-# Make the matrix diagonally dominant
-for i in range(n):
-    diagonal_element = A[i, i]
-    row_sum = np.sum(np.abs(A[i, :])) - np.abs(diagonal_element)
-    if diagonal_element <= row_sum:
-        A[i, i] += row_sum - diagonal_element + 1
-
-x = np.random.random(n) * 100
-
-inp_mat_fname = 'inp_mat.txt'
-inp_vec_fname = 'inp_vec.txt'
-out_fname = 'out_vec.txt'
-
-
-if args.mul:
-    A_z = A.copy()
-    if args.ign_diag:
-        print("Ignoring diagonal")
-        for i in range(n):
-            A_z[i, i] = 0
-
-    y = np.dot(A_z, x)
-else:
-    y = np.linalg.solve(A, x)
 
 def write_matrix(A, fname):
     n = A.shape[0]
@@ -65,36 +23,77 @@ def read_vector(fname, n):
     ans = np.array(text_double)
     return ans
 
-def run_program():
+def run_program(inp_mat_fname, inp_vec_fname, out_fname):
     cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
     print(cmd)
     os.system(cmd)
 
-write_matrix(A, inp_mat_fname)
-write_vector(x, inp_vec_fname)
-run_program()
+
+def one(n, p, debug=False, mul=False, passfail=False):
+    assert(int(np.sqrt(nprocs))**2 == nprocs)
+
+    if n is None:
+        n = np.random.randint(4, 100)
+    A = np.random.random((n, n)) * 10
+
+    # Make the matrix diagonally dominant
+    for i in range(n):
+        diagonal_element = A[i, i]
+        row_sum = np.sum(np.abs(A[i, :])) - np.abs(diagonal_element)
+        if diagonal_element <= row_sum:
+            A[i, i] += row_sum - diagonal_element + 1
+
+    x = np.random.random(n) * 100
+
+    if mul:
+        y = np.matmul(A, x)
+    else:
+        y = np.linalg.solve(A, x)
+
+    inp_mat_fname = 'inp_mat.txt'
+    inp_vec_fname = 'inp_vec.txt'
+    out_fname = 'out_vec.txt'
+
+    write_matrix(A, inp_mat_fname)
+    write_vector(x, inp_vec_fname)
+    run_program(inp_mat_fname, inp_vec_fname, out_fname)
+
+    ans = read_vector('out_vec.txt', n)
+    err = y - ans
+    err_norm = np.linalg.norm(err)
+    criteria = 1e-9 * n
+
+    if debug:
+        print('Expected')
+        print(y)
+
+        print('Actual')
+        print(ans)
+
+        print(f'Error:')
+        print(err)
+
+    if passfail:
+        print(f'Error norm: {err_norm}')
+        print(f'Criteria: {criteria}')
+        if (err_norm < criteria):
+            print('PASS')
+            exit(0)
+        else:
+            print('FAIL')
+            exit(1)
+
+    assert(err_norm < criteria)
 
 
-ans = read_vector('out_vec.txt', n)
-err = y - ans
-err_norm = np.linalg.norm(err)
-criteria = 1e-9 * n
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('nprocs', type=int, help="Number of CPUs")
+    parser.add_argument('--n', type=int, default=None, help="Problem size (n)")
+    parser.add_argument('--debug', type=bool, default=False, help="Debug output")
+    parser.add_argument('--mul', type=bool, default=False, help="Will test mat-vec-mul if true")
+    args = parser.parse_args()
+    nprocs = args.nprocs
 
-if args.debug:
-    print('Expected')
-    print(y)
-
-    print('Actual')
-    print(ans)
-
-    print(f'Error:')
-    print(err)
-
-print(f'Error norm: {err_norm}')
-print(f'Criteria: {criteria}')
-if (err_norm < criteria):
-    print('PASS')
-    exit(0)
-else:
-    print('FAIL')
-    exit(1)
+    one(args.n, args.nprocs, debug=args.debug, mul=args.mul, passfail=True)
