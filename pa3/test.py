@@ -7,6 +7,7 @@ parser.add_argument('nprocs', type=int, help="Number of CPUs")
 parser.add_argument('--n', type=int, default=None, help="Problem size (n)")
 parser.add_argument('--debug', type=bool, default=False, help="Debug output")
 parser.add_argument('--mul', type=bool, default=False, help="Will test mat-vec-mul if true")
+parser.add_argument('--ign_diag', type=bool, default=False, help="Ignore diagonal if mat-vec-mul")
 args = parser.parse_args()
 
 nprocs = args.nprocs
@@ -16,6 +17,7 @@ assert(int(np.sqrt(nprocs))**2 == nprocs)
 if n is None:
     n = np.random.randint(4, 100)
 A = np.random.random((n, n)) * 10
+
 # Make the matrix diagonally dominant
 for i in range(n):
     diagonal_element = A[i, i]
@@ -29,8 +31,15 @@ inp_mat_fname = 'inp_mat.txt'
 inp_vec_fname = 'inp_vec.txt'
 out_fname = 'out_vec.txt'
 
+
 if args.mul:
-    y = np.dot(A, x)
+    A_z = A.copy()
+    if args.ign_diag:
+        print("Ignoring diagonal")
+        for i in range(n):
+            A_z[i, i] = 0
+
+    y = np.dot(A_z, x)
 else:
     y = np.linalg.solve(A, x)
 
@@ -57,7 +66,7 @@ def read_vector(fname, n):
     return ans
 
 def run_program():
-    cmd = f'mpirun -np {nprocs} --oversubscribe src/pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
+    cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
     print(cmd)
     os.system(cmd)
 
