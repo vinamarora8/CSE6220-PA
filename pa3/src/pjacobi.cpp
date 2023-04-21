@@ -453,6 +453,8 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
         // Broadcast 
         MPI_Bcast(&x_t[0], x_t.size(), MPI_DOUBLE, diag_rank, col_comm);
         DBGMSG(debug, g2s(g) << " got x_t from " << diag_rank);
+
+        MPI_Comm_free(&col_comm);
     }
 
     // Local dot product
@@ -481,6 +483,8 @@ void mat_vec_mult(Vec &y, const Mat &A, const Vec &x, const GridInfo &g, bool ig
     // Reduce
     MPI_Reduce(&local_y[0], &y[0], local_y.size(), MPI_DOUBLE, MPI_SUM, root_rank, row_comm);
     DBGMSG(debug, g2s(g) << " reduced to " << root_rank);
+
+    MPI_Comm_free(&row_comm);
 }
 
 
