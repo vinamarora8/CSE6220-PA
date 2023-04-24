@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import subprocess
 
 
 def write_matrix(A, fname):
@@ -24,16 +25,23 @@ def read_vector(fname, n):
     ans = np.array(text_double)
     return ans
 
-def run_program(inp_mat_fname, inp_vec_fname, out_fname):
+def run_program(p, inp_mat_fname, inp_vec_fname, out_fname):
 
-    cmd = f'mpirun -np {nprocs} --oversubscribe ./pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
-    print(cmd)
-    os.system(cmd)
+    cmd = f'mpirun -np {p} src/pjacobi {inp_mat_fname} {inp_vec_fname} {out_fname}'
+    try:
+        output = subprocess.check_output(cmd, shell=True)
+        output = str(output).strip().split()
+        runtime = float(output[1])
+    except subprocess.CalledProcessError as e:
+        print(e.output)
+
+    print(f'Runtime: {runtime}')
+    return runtime
 
 
 def one(n, p, debug=False, mul=False, passfail=False):
 
-    assert(int(np.sqrt(nprocs))**2 == nprocs)
+    assert(int(np.sqrt(p))**2 == p)
 
     if n is None:
         n = np.random.randint(4, 100)
@@ -59,7 +67,7 @@ def one(n, p, debug=False, mul=False, passfail=False):
 
     write_matrix(A, inp_mat_fname)
     write_vector(x, inp_vec_fname)
-    run_program(inp_mat_fname, inp_vec_fname, out_fname)
+    runtime = run_program(p, inp_mat_fname, inp_vec_fname, out_fname)
 
     ans = read_vector('out_vec.txt', n)
     err = y - ans
@@ -87,6 +95,8 @@ def one(n, p, debug=False, mul=False, passfail=False):
             exit(1)
 
     assert(err_norm < criteria)
+
+    return runtime
 
 
 if __name__ == "__main__":
