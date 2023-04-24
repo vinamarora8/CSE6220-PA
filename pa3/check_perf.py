@@ -6,6 +6,8 @@ n = 2**np.arange(2, 10)
 
 runtimes = np.zeros((len(p), len(n)))
 
+op_fname = "perf.txt"
+
 def avg_runtime(n, p, count):
     times = []
     for i in range(count):
@@ -16,4 +18,6 @@ def avg_runtime(n, p, count):
 
 for i in range(len(p)):
     for j in range(len(n)):
-        runtimes[i, j] = avg_runtime(n[j], p[i], 3)
+        runtimes[i, j] = avg_runtime(n[j], p[i], 4)
+        with open(op_fname, "a") as f:
+            f.write(f'{n[j]} {p[i]} {runtimes[i, j]}\n')
