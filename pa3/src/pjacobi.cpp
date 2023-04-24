@@ -73,13 +73,14 @@ int main(int argc, char *argv[])
     MPI_Cart_coords(grid_info.grid_comm, rank, 2, grid_info.grid_coords);
 
     DBGMSG(debug, "Rank " << rank << " coords: " << g2s(grid_info));
-    MPI_Barrier(grid_info.grid_comm);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Read input matrix and vector
     Mat A;
     Vec b;
     distribute_inp(A, b, grid_info, in_mat_fname, in_vec_fname);
 
+    MPI_Barrier(MPI_COMM_WORLD);
     double starttime = MPI_Wtime();
 
     // Compute answer
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
         iter++;
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     double runtime = (MPI_Wtime() - starttime) * 1000.0;
     if (rank == 0)
         std::cout << "Runtime: " << runtime << " ms" << std::endl;
