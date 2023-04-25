@@ -50,7 +50,7 @@ std::string g2s(const GridInfo &g); // Converts grid coords to string
 
 int main(int argc, char *argv[])
 {
-    bool debug = true;
+    bool debug = false;
 
     char *in_mat_fname = argv[1];
     char *in_vec_fname = argv[2];
@@ -73,13 +73,14 @@ int main(int argc, char *argv[])
     MPI_Cart_coords(grid_info.grid_comm, rank, 2, grid_info.grid_coords);
 
     DBGMSG(debug, "Rank " << rank << " coords: " << g2s(grid_info));
-    MPI_Barrier(grid_info.grid_comm);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Read input matrix and vector
     Mat A;
     Vec b;
     distribute_inp(A, b, grid_info, in_mat_fname, in_vec_fname);
 
+    MPI_Barrier(MPI_COMM_WORLD);
     double starttime = MPI_Wtime();
 
     // Compute answer
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
         iter++;
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     double runtime = (MPI_Wtime() - starttime) * 1000.0;
     if (rank == 0)
         std::cout << "Runtime: " << runtime << " ms" << std::endl;
@@ -331,20 +333,29 @@ void gather_output(char *op_fname, const Vec &x, const GridInfo &g)
 void compute_diagonal(Vec &d, const Mat &A, const GridInfo &g)
 {
     // compute local_d
+    bool debug = true;
     Vec local_d(A.size());
     for(int i = 0; i < local_d.size(); i++)
     {
         local_d[i] = A[i][i];
     }
+    // for coord (0, 0) copy local_d to d
+    if (g.grid_coords[0] == 0 && g.grid_coords[1] == 0)
+    {
+        // Copy
+        // Separate so that Send and Recv don't overlap for the same process
+        d = local_d;
+        DBGMSG(debug, g2s(g) << " copied d");
+    }
     // Send
-    if(g.grid_coords[0] == g.grid_coords[1]){
+    else if(g.grid_coords[0] == g.grid_coords[1]){
         int recv_rank;
         int recv_coord[2] = {g.grid_coords[0], 0};
         MPI_Cart_rank(g.grid_comm, recv_coord, &recv_rank);
         MPI_Send(&local_d[0], local_d.size(), MPI_DOUBLE, recv_rank, 0, g.grid_comm);
     }
     // Receive
-    if(g.grid_coords[1] == 0){
+    else if(g.grid_coords[1] == 0){
         int send_rank;
         int send_coord[2] = {g.grid_coords[0], g.grid_coords[0]};
         MPI_Cart_rank(g.grid_comm, send_coord, &send_rank);
